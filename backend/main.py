@@ -10,15 +10,32 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
-from fastapi import FastAPI
+# ── Sentry (avant tout autre import applicatif) ──────────────────────────────
+import sentry_sdk
+_sentry_dsn = os.getenv("SENTRY_DSN")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.3,
+        environment=os.getenv("SENTRY_ENV", "production"),
+    )
+
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from routers.zones import router as zones_router, _get_scores
 from config import CACHE_TTL_SECONDS
 from services.storage import init_db, get_calibration_baselines, get_calibration_baselines_per_zone
-import services.scoring as scoring                                 # ← AJOUT
+import services.scoring as scoring
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("main")
+
+# ── Rate limiter ──────────────────────────────────────────────────────────────
+_rate_limit = os.getenv("RATE_LIMIT", "30/minute")
+limiter = Limiter(key_func=get_remote_address, default_limits=[_rate_limit])
 
 
 async def _refresh_loop():
@@ -97,16 +114,31 @@ def _apply_calibration(min_count: int = 96) -> None:
     log.info("Recalibration par zone : %d zones calibrées.", len(zone_baselines))
 
 
+async def _backup_loop():
+    """Sauvegarde automatique de la DB toutes les 6h."""
+    from scripts.backup_db import backup_db
+    INTERVAL = 6 * 3600
+    backup_db()  # backup immédiat au démarrage
+    while True:
+        await asyncio.sleep(INTERVAL)
+        try:
+            backup_db()
+        except Exception as e:
+            log.error(f"Backup error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("Urban Signal Engine — starting")
     init_db()
-    _apply_calibration()          # recalibration immédiate au démarrage
+    _apply_calibration()
     task_refresh = asyncio.create_task(_refresh_loop())
-    task_calib   = asyncio.create_task(_calibration_loop())  # ← NOUVEAU
+    task_calib   = asyncio.create_task(_calibration_loop())
+    task_backup  = asyncio.create_task(_backup_loop())
     yield
     task_refresh.cancel()
     task_calib.cancel()
+    task_backup.cancel()
 
 
 app = FastAPI(
@@ -116,7 +148,38 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET","POST"], allow_headers=["*"])
+# ── Rate limiter ──────────────────────────────────────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ── CORS — configurable via ALLOWED_ORIGINS env var ───────────────────────────
+_default_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+_env_origins = os.getenv("ALLOWED_ORIGINS", "")
+_origins = [o.strip() for o in _env_origins.split(",") if o.strip()] if _env_origins else _default_origins
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
+    allow_credentials=True,
+)
+
+
+# ── Security headers middleware ───────────────────────────────────────────────
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if os.getenv("SENTRY_ENV") == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    return response
+
+
 app.include_router(zones_router)
 
 
@@ -130,7 +193,7 @@ async def health():
         "zones":    12,
         "cache_age": age,
         "ttl":      CACHE_TTL_SECONDS,
-        "baseline": scoring.BASELINE,   # ← visible dans /health pour debug
+        "baseline": scoring.BASELINE,
     }
 
 
