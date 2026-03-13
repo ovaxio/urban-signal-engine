@@ -26,8 +26,9 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
   } catch (_) {}
 
   if (!detail) return (
-    <div style={{ padding: 40, color: "#ef4444", fontSize: 14 }}>
-      Zone introuvable. <Link href="/" style={{ color: "#a5b4fc" }}>← Retour</Link>
+    <div style={{ padding: 40, textAlign: "center" }}>
+      <div style={{ fontSize: 14, color: "#94a3b8", marginBottom: 12 }}>Zone introuvable ou backend indisponible.</div>
+      <Link href="/" style={{ color: "#a5b4fc", fontSize: 12 }}>← Retour au tableau de bord</Link>
     </div>
   );
 
@@ -66,8 +67,8 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
       <main style={{ maxWidth: 700, margin: "0 auto", padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
 
         {/* ── SCORE HEADER ── */}
-        <div style={{ background: "#1a1d27", borderRadius: 12, padding: 24, border: `1px solid ${col}33`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div style={{ maxWidth: 380 }}>
+        <div style={{ background: "#1a1d27", borderRadius: 12, padding: 24, border: `1px solid ${col}33`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontSize: 26, fontWeight: 800 }}>{z.zone_name}</div>
             {!isSimMode && (
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
@@ -151,7 +152,7 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
         {/* ── COMPOSANTES ── */}
         <div style={{ background: "#1a1d27", borderRadius: 12, padding: 20, border: "1px solid #2d3148" }}>
           <div style={{ fontSize: 10, color: "#64748b", letterSpacing: "0.1em", marginBottom: 14, fontWeight: 600 }}>COMPOSANTES</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8 }}>
             {(["risk","anomaly","conv","spread","phi"] as const).map(k => (
               <div key={k} style={{ textAlign: "center", padding: 12, background: "#13161f", borderRadius: 8 }}>
                 <div style={{ fontSize: 9, color: "#64748b", marginBottom: 4, letterSpacing: "0.06em" }}>{k.toUpperCase()}</div>
@@ -165,21 +166,21 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
         {!isSimMode && forecast && (
           <div style={{ background: "#1a1d27", borderRadius: 12, padding: 20, border: "1px solid #2d3148" }}>
             <div style={{ fontSize: 10, color: "#64748b", letterSpacing: "0.1em", marginBottom: 14, fontWeight: 600 }}>PRÉVISION</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <div style={{ flex: 1, textAlign: "center", padding: 14, background: "#13161f", borderRadius: 8, border: `1px solid ${scoreColor(forecast.current_score)}44` }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))", gap: 10 }}>
+              <div style={{ textAlign: "center", padding: 14, background: "#13161f", borderRadius: 8, border: `1px solid ${scoreColor(forecast.current_score)}44` }}>
                 <div style={{ fontSize: 10, color: "#64748b", marginBottom: 5 }}>Maintenant</div>
                 <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(forecast.current_score) }}>{forecast.current_score}</div>
                 <div style={{ fontSize: 10, color: scoreColor(forecast.current_score), marginTop: 3 }}>{forecast.current_level}</div>
               </div>
               {forecast.forecast.map((f: any) => (
-                <div key={f.horizon_min} style={{ flex: 1, textAlign: "center", padding: 14, background: "#13161f", borderRadius: 8, border: `1px solid ${scoreColor(f.urban_score)}33` }}>
+                <div key={f.horizon_min} style={{ textAlign: "center", padding: 14, background: "#13161f", borderRadius: 8, border: `1px solid ${scoreColor(f.urban_score)}33` }}>
                   <div style={{ fontSize: 10, color: "#64748b", marginBottom: 5 }}>+{f.horizon_min} min</div>
                   <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(f.urban_score) }}>{f.urban_score}</div>
                   <div style={{ fontSize: 10, color: scoreColor(f.urban_score), marginTop: 3 }}>{f.level}</div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: "#334155", marginTop: 8 }}>{forecast.disclaimer}</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginTop: 8 }}>{forecast.disclaimer}</div>
           </div>
         )}
 

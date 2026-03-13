@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { fetchAlerts, scoreColor } from "@/lib/api";
 
 type Alert = {
@@ -29,12 +29,18 @@ function timeAgo(ts: string): string {
 export default function AlertPanel() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [open,   setOpen]   = useState(true);
+  const [error,  setError]  = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const load = async () => {
     try {
+      setError(null);
       const data = await fetchAlerts(10);
       setAlerts(data?.alerts ?? []);
-    } catch (_) {}
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setError("Alertes indisponibles");
+    }
   };
 
   useEffect(() => {
@@ -48,11 +54,13 @@ export default function AlertPanel() {
   return (
     <div style={{ background: "#1a1d27", border: "1px solid #2d3148", borderRadius: 10, overflow: "hidden" }}>
       {/* Header */}
-      <div
+      <button
         onClick={() => setOpen(o => !o)}
-        style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", cursor: "pointer", userSelect: "none" }}
+        aria-expanded={open}
+        aria-controls="alert-list"
+        style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", cursor: "pointer", userSelect: "none", width: "100%", background: "transparent", border: "none", color: "inherit", font: "inherit" }}
       >
-        <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.1em", flex: 1 }}>
+        <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.1em", flex: 1, textAlign: "left" }}>
           ALERTES
         </span>
         {unread > 0 && (
@@ -60,14 +68,21 @@ export default function AlertPanel() {
             {unread}
           </span>
         )}
-        <span style={{ fontSize: 10, color: "#475569" }}>{open ? "▲" : "▼"}</span>
-      </div>
+        <span style={{ fontSize: 10, color: "#475569" }} aria-hidden="true">{open ? "▲" : "▼"}</span>
+      </button>
 
       {/* Liste */}
       {open && (
-        <div style={{ borderTop: "1px solid #2d3148" }}>
-          {alerts.length === 0 ? (
-            <div style={{ padding: "14px", fontSize: 11, color: "#334155", textAlign: "center" }}>
+        <div id="alert-list" role="region" aria-label="Liste des alertes" style={{ borderTop: "1px solid #2d3148" }}>
+          {error ? (
+            <div style={{ padding: "14px", fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
+              {error}
+              <button onClick={load} style={{ display: "block", margin: "6px auto 0", fontSize: 10, color: "#a5b4fc", background: "transparent", border: "none", cursor: "pointer" }}>
+                Réessayer
+              </button>
+            </div>
+          ) : alerts.length === 0 ? (
+            <div style={{ padding: "14px", fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
               Aucune alerte enregistrée.
             </div>
           ) : (
@@ -76,7 +91,7 @@ export default function AlertPanel() {
               const dir  = a.urban_score > a.prev_score ? "↑" : "↓";
               return (
                 <div
-                  key={i}
+                  key={`${a.ts}-${a.zone_id}`}
                   style={{
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "8px 14px",
@@ -93,7 +108,7 @@ export default function AlertPanel() {
                       {meta.label} · {a.prev_score} {dir} {a.urban_score}
                     </div>
                   </div>
-                  <div style={{ fontSize: 10, color: "#334155", flexShrink: 0 }}>
+                  <div style={{ fontSize: 10, color: "#64748b", flexShrink: 0 }}>
                     {timeAgo(a.ts)}
                   </div>
                 </div>

@@ -122,6 +122,7 @@ export default function ZoneMap({ zones }: Props) {
       style={{ height: 420, width: "100%", borderRadius: 12, background: "#13161f" }}
       zoomControl={true}
       attributionControl={false}
+      aria-label="Carte interactive des zones urbaines de Lyon"
     >
       <MapResizer />
 
