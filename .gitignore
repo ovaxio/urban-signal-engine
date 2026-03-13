@@ -1,0 +1,23 @@
+# Backend Python
+backend/.env*
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+
+# Frontend Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Claude Code
+settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

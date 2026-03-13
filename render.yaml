@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: urban-signal-engine-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: sh start.sh
+    healthCheckPath: /health
+    numInstances: 1
+    plan: free
+    envVars:
+      - key: TOMTOM_API_KEY
+        sync: false
+      - key: GRANDLYON_LOGIN
+        sync: false
+      - key: GRANDLYON_PASSWORD
+        sync: false
+      - key: ENABLE_HISTORY
+        value: "true"
+      - key: ALERT_WEBHOOK_URL
+        value: ""
