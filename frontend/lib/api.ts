@@ -1,3 +1,5 @@
+// ── API layer — fetch only, no domain logic ─────────────────────────────────
+
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 export async function fetchScores(params?: { min_score?: number; level?: string }) {
@@ -11,20 +13,14 @@ export async function fetchScores(params?: { min_score?: number; level?: string 
 
 export async function fetchDetail(id: string, init?: RequestInit) {
   const url = new URL(`${BASE}/zones/${id}/detail`);
-  const res = await fetch(url.toString(), {
-    cache: "no-store",
-    ...init,
-  });
+  const res = await fetch(url.toString(), { cache: "no-store", ...init });
   if (!res.ok) throw new Error(`Failed to fetch zone detail: ${res.status}`);
   return res.json();
 }
 
 export async function fetchForecast(id: string, init?: RequestInit) {
   const url = new URL(`${BASE}/zones/${id}/forecast`);
-  const res = await fetch(url.toString(), {
-    cache: "no-store",
-    ...init,
-  });
+  const res = await fetch(url.toString(), { cache: "no-store", ...init });
   if (!res.ok) throw new Error(`Failed to fetch zone forecast: ${res.status}`);
   return res.json();
 }
@@ -33,20 +29,6 @@ export async function fetchHealth() {
   const r = await fetch(`${BASE}/health`, { next: { revalidate: 10 } });
   if (!r.ok) throw new Error("health failed");
   return r.json();
-}
-
-export function scoreColor(s: number): string {
-  if (s < 35) return "#22c55e";
-  if (s < 55) return "#eab308";
-  if (s < 72) return "#f97316";
-  return "#ef4444";
-}
-
-export function scoreLevel(s: number): string {
-  if (s < 35) return "CALME";
-  if (s < 55) return "MODÉRÉ";
-  if (s < 72) return "TENDU";
-  return "CRITIQUE";
 }
 
 export async function fetchSimulation(date: string) {
