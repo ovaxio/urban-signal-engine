@@ -12,12 +12,14 @@ import SimBanner          from "@/components/layout/SimBanner";
 import ZoneHistoryChart   from "@/components/chart/ZoneHistoryChart";
 
 type PageProps = {
-  params:       { id: string };
-  searchParams: { sim?: string };
+  params:       Promise<{ id: string }>;
+  searchParams: Promise<{ sim?: string }>;
 };
 
 export default async function ZonePage({ params, searchParams }: PageProps) {
-  const simDate = searchParams.sim ?? null;
+  const { id } = await params;
+  const { sim } = await searchParams;
+  const simDate = sim ?? null;
   const isSimMode = !!simDate;
 
   let detail: ZoneDetail | null = null;
@@ -25,11 +27,11 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
 
   try {
     if (isSimMode) {
-      detail = await fetchSimulationDetail(params.id, simDate!);
+      detail = await fetchSimulationDetail(id, simDate!);
     } else {
       [detail, forecast] = await Promise.all([
-        fetchDetail(params.id, { cache: "no-store" }),
-        fetchForecast(params.id, { cache: "no-store" }),
+        fetchDetail(id, { cache: "no-store" }),
+        fetchForecast(id, { cache: "no-store" }),
       ]);
     }
   } catch {}
@@ -86,7 +88,7 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
         {!isSimMode && <ZoneHistoryChart zoneId={detail.zone_id} limit={48} />}
 
         {isSimMode && (
-          <SimBanner simDate={simDate!} zoneId={params.id} />
+          <SimBanner simDate={simDate!} zoneId={id} />
         )}
 
       </main>

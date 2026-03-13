@@ -8,12 +8,14 @@ type ResolvedTheme = "light" | "dark";
 type ThemeCtx = {
   choice: ThemeChoice;
   resolved: ResolvedTheme;
+  mounted: boolean;
   setTheme: (t: ThemeChoice) => void;
 };
 
 const ThemeContext = createContext<ThemeCtx>({
   choice: "system",
   resolved: "dark",
+  mounted: false,
   setTheme: () => {},
 });
 
@@ -31,12 +33,9 @@ function resolve(choice: ThemeChoice): ResolvedTheme {
 }
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [choice, setChoice] = useState<ThemeChoice>(() => {
-    if (typeof window === "undefined") return "system";
-    return (localStorage.getItem("theme") as ThemeChoice) ?? "system";
-  });
-
-  const [resolved, setResolved] = useState<ResolvedTheme>(() => resolve(choice));
+  const [choice, setChoice] = useState<ThemeChoice>("system");
+  const [resolved, setResolved] = useState<ResolvedTheme>("dark");
+  const [mounted, setMounted] = useState(false);
 
   const applyTheme = useCallback((c: ThemeChoice) => {
     const r = resolve(c);
@@ -44,11 +43,20 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     setResolved(r);
   }, []);
 
-  // Apply on choice change + persist
+  // Hydrate from localStorage after mount
   useEffect(() => {
+    const stored = (localStorage.getItem("theme") as ThemeChoice) ?? "system";
+    setChoice(stored);
+    applyTheme(stored);
+    setMounted(true);
+  }, [applyTheme]);
+
+  // Apply on choice change + persist (skip until mounted)
+  useEffect(() => {
+    if (!mounted) return;
     localStorage.setItem("theme", choice);
     applyTheme(choice);
-  }, [choice, applyTheme]);
+  }, [choice, applyTheme, mounted]);
 
   // Listen for OS preference changes when in system mode
   useEffect(() => {
@@ -60,7 +68,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   }, [choice, applyTheme]);
 
   return (
-    <ThemeContext.Provider value={{ choice, resolved, setTheme: setChoice }}>
+    <ThemeContext.Provider value={{ choice, resolved, mounted, setTheme: setChoice }}>
       {children}
     </ThemeContext.Provider>
   );

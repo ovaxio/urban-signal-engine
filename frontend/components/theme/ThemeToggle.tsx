@@ -7,7 +7,7 @@ const ICONS: Record<ThemeChoice, string> = { dark: "☾", light: "☀", system: 
 const LABELS: Record<ThemeChoice, string> = { dark: "Thème sombre", light: "Thème clair", system: "Thème système" };
 
 export default function ThemeToggle() {
-  const { choice, setTheme } = useTheme();
+  const { choice, mounted, setTheme } = useTheme();
 
   const next = () => {
     const idx = CYCLE.indexOf(choice);
@@ -17,8 +17,8 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={next}
-      aria-label={LABELS[choice]}
-      title={LABELS[choice]}
+      aria-label={mounted ? LABELS[choice] : LABELS.system}
+      title={mounted ? LABELS[choice] : LABELS.system}
       style={{
         fontSize: 14,
         color: "var(--text-secondary)",
@@ -35,7 +35,7 @@ export default function ThemeToggle() {
         gap: 4,
       }}
     >
-      <span aria-hidden="true">{ICONS[choice]}</span>
+      <span aria-hidden="true">{mounted ? ICONS[choice] : ICONS.system}</span>
     </button>
   );
 }
