@@ -27,8 +27,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from routers.zones import router as zones_router, _get_scores
 from routers.contact import router as contact_router
+from routers.admin import router as admin_router
 from config import CACHE_TTL_SECONDS
 from services.storage import init_db, get_calibration_baselines, get_calibration_baselines_per_zone
+from services.auth import init_auth_db
 import services.scoring as scoring
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -132,6 +134,7 @@ async def _backup_loop():
 async def lifespan(app: FastAPI):
     log.info("Urban Signal Engine — starting")
     init_db()
+    init_auth_db()
     _apply_calibration()
     task_refresh = asyncio.create_task(_refresh_loop())
     task_calib   = asyncio.create_task(_calibration_loop())
@@ -161,8 +164,8 @@ _origins = [o.strip() for o in _env_origins.split(",") if o.strip()] if _env_ori
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
     allow_credentials=True,
 )
 
@@ -183,6 +186,7 @@ async def add_security_headers(request: Request, call_next):
 
 app.include_router(zones_router)
 app.include_router(contact_router)
+app.include_router(admin_router)
 
 
 @app.get("/health", tags=["system"])
