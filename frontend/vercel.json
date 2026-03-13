@@ -3,6 +3,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "env": {
-    "NEXT_PUBLIC_API_BASE": "@next_public_api_base"
+    "NEXT_PUBLIC_API_BASE": "@NEXT_PUBLIC_API_BASE"
   }
 }
