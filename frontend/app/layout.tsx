@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ThemeProvider from "@/components/theme/ThemeProvider";
+import PostHogScript from "@/components/analytics/PostHogScript";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>
+        <PostHogScript />
       </body>
     </html>
   );

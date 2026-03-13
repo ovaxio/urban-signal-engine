@@ -669,7 +669,7 @@ async def fetch_all_signals() -> tuple:
     """
     weather_t, event_t, traffic_t, incident_result = await asyncio.gather(
         fetch_weather(),
-        fetch_event_signals(),   # ← OpenAgenda live (remplace fetch_events neutralisée)
+        fetch_event_signals(),
         fetch_traffic(),
         fetch_incidents(),
     )

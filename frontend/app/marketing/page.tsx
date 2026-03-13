@@ -120,7 +120,7 @@ export default function MarketingPage() {
           <li><a href="#fonctionnalites">Fonctionnalités</a></li>
           <li><a href="#methode">Méthode</a></li>
         </ul>
-        <a href="#contact"><button className={s.navCta}>Nous contacter</button></a>
+        <Link href="/marketing/contact"><button className={s.navCta}>Nous contacter</button></Link>
       </nav>
 
       {/* ── Hero ────────────────────────────────────────────────────────── */}
@@ -142,11 +142,11 @@ export default function MarketingPage() {
                 Voir le dashboard live →
               </button>
             </Link>
-            <a href="#contact">
+            <Link href="/marketing/contact">
               <button className={s.btnSecondary}>
                 Demander une présentation
               </button>
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -317,9 +317,9 @@ export default function MarketingPage() {
           urbain.
         </p>
         <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-          <a href="mailto:contact@urbansignal.fr">
+          <Link href="/marketing/contact">
             <button className={s.btnPrimary}>Nous contacter →</button>
-          </a>
+          </Link>
           <Link href="/">
             <button className={s.btnSecondary}>Explorer le dashboard</button>
           </Link>
@@ -328,11 +328,11 @@ export default function MarketingPage() {
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
       <footer className={s.footer}>
-        <span>© 2026 Urban Signal Engine · Données ouvertes · Lyon</span>
+        <span>© 2026 Urban Signal Engine · Codeblend EURL · Lyon</span>
         <ul className={s.footerLinks}>
-          <li><a href="#">Mentions légales</a></li>
-          <li><a href="#">Politique de confidentialité</a></li>
-          <li><a href="mailto:contact@urbansignal.fr">Contact</a></li>
+          <li><Link href="/marketing/mentions-legales">Mentions légales</Link></li>
+          <li><Link href="/marketing/politique-confidentialite">Politique de confidentialité</Link></li>
+          <li><Link href="/marketing/contact">Contact</Link></li>
         </ul>
       </footer>
     </div>

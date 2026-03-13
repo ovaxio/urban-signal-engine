@@ -471,6 +471,171 @@
 
 .footerLinks a:hover { color: var(--text-secondary); }
 
+/* ── Legal pages ───────────────────────────────────────────────────────────── */
+
+.legalPage {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 140px clamp(24px, 5vw, 80px) 80px;
+}
+
+.legalTitle {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+
+.legalUpdated {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 48px;
+}
+
+.legalSection {
+  margin-bottom: 40px;
+}
+
+.legalSection h2 {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.legalSection p {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.legalSection ul {
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  padding-left: 0;
+}
+
+.legalSection ul li::before {
+  content: "—  ";
+  color: var(--text-muted);
+}
+
+.legalSection a {
+  color: var(--landing-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.legalSection code {
+  font-size: 13px;
+  background: var(--bg-inner);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.legalBack {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.legalBack a {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+
+.legalBack a:hover {
+  color: var(--text-primary);
+}
+
+/* ── Contact form ──────────────────────────────────────────────────────────── */
+
+.contactForm {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.contactField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.contactField label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.contactField input,
+.contactField textarea {
+  font-family: var(--font-body);
+  font-size: 15px;
+  padding: 12px 16px;
+  background: var(--bg-inner);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+  resize: vertical;
+}
+
+.contactField input:focus,
+.contactField textarea:focus {
+  outline: none;
+  border-color: var(--landing-accent);
+}
+
+.contactField input:disabled,
+.contactField textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.contactField input::placeholder,
+.contactField textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.contactError {
+  font-size: 14px;
+  color: var(--landing-red);
+  line-height: 1.5;
+}
+
+.contactSuccess {
+  text-align: center;
+  padding: 48px 0;
+}
+
+.contactSuccess h2 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+
+.contactSuccess p {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+}
+
+.contactBackLink {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--landing-accent);
+}
+
 /* ── Delight: scroll reveal ─────────────────────────────────────────────────── */
 
 .reveal {
