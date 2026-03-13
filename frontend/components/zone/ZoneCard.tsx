@@ -15,14 +15,13 @@ export default function ZoneCard({ zone, simDate }: Props) {
 
   return (
     <Link href={href}>
-      <div style={{
+      <div className="zone-card" style={{
         background: isAlert ? `${col}0d` : "#1a1d27",
         border: `1px solid ${col}${isAlert ? "66" : "33"}`,
         borderRadius: 10,
         padding: "14px 16px",
         cursor: "pointer",
         boxShadow: isAlert ? `0 0 14px ${col}22` : "none",
-        transition: "box-shadow 0.3s",
         position: "relative",
         minWidth: 0,
       }}>

@@ -99,7 +99,18 @@ export default function Home() {
       <main style={{ flex: 1, padding: "16px 24px" }}>
         <div style={{ maxWidth: 960, margin: "0 auto" }}>
           {loading ? (
-            <div style={{ textAlign: "center", color: "#94a3b8", marginTop: 80, fontSize: 14 }}>Chargement…</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Skeleton stats */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 52, flex: 1, minWidth: 120 }} />)}
+              </div>
+              {/* Skeleton map */}
+              <div className="skeleton" style={{ height: 420, borderRadius: 12 }} />
+              {/* Skeleton grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10 }}>
+                {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton" style={{ height: 140, borderRadius: 10 }} />)}
+              </div>
+            </div>
           ) : error && zones.length === 0 ? (
             <ErrorState message={error} onRetry={loadLive} />
           ) : (
