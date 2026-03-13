@@ -6,7 +6,6 @@ import { fetchScores, fetchHealth, fetchSimulation } from "@/lib/api";
 import { scoreColor } from "@/domain/scoring";
 import { REFRESH_INTERVAL } from "@/domain/constants";
 import type { ZoneSummary, HealthStatus, FilterLevel } from "@/domain/types";
-import "@/components/map/zone-map.css";
 
 import DashboardHeader from "@/components/layout/DashboardHeader";
 import FilterBar       from "@/components/layout/FilterBar";

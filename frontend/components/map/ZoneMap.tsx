@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import { useRouter } from "next/navigation";
 import "leaflet/dist/leaflet.css";
+import "./zone-map.css";
 import type { ZoneSummary } from "@/domain/types";
 import { scoreColor, scoreToRadius } from "@/domain/scoring";
 import { ZONE_CENTROIDS } from "@/domain/constants";
@@ -12,14 +13,28 @@ type Props = {
   zones: ZoneSummary[];
 };
 
+// ─── Responsive scaling ─────────────────────────────────────────────────────
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 480px)");
+    setMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return mobile;
+}
+
 // ─── Cercle pulsant pour les zones TENDU/CRITIQUE ───────────────────────────
 
-function PulseMarker({ pos, color, score, onClick }: {
-  pos: [number, number]; color: string; score: number; onClick: () => void;
+function PulseMarker({ pos, color, score, radius, onClick }: {
+  pos: [number, number]; color: string; score: number; radius: number; onClick: () => void;
 }) {
   const { DivIcon } = require("leaflet");
   const { Marker: RLMarker } = require("react-leaflet");
-  const r = scoreToRadius(score);
+  const r = radius;
   const size = r * 2 + 20;
 
   const icon = new DivIcon({
@@ -51,7 +66,7 @@ function PulseMarker({ pos, color, score, onClick }: {
           background:${color}55;
           border:2px solid ${color};
           display:flex;align-items:center;justify-content:center;
-          font-weight:700;font-size:12px;color:${color};
+          font-weight:700;font-size:${r < 20 ? 10 : 12}px;color:${color};
           text-shadow:0 1px 3px #000;
           cursor:pointer;
         ">${score}</span>
@@ -76,13 +91,15 @@ function MapResizer() {
 
 export default function ZoneMap({ zones }: Props) {
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const radiusScale = isMobile ? 0.7 : 1;
 
   return (
     <MapContainer
       center={[45.757, 4.832]}
-      zoom={13}
-      style={{ height: 420, width: "100%", borderRadius: 12, background: "#13161f" }}
-      zoomControl={true}
+      zoom={isMobile ? 12 : 13}
+      className="zone-map-container"
+      zoomControl={!isMobile}
       attributionControl={false}
       aria-label="Carte interactive des zones urbaines de Lyon"
     >
@@ -97,7 +114,7 @@ export default function ZoneMap({ zones }: Props) {
         const pos = ZONE_CENTROIDS[zone.zone_id];
         if (!pos) return null;
         const color  = scoreColor(zone.urban_score);
-        const radius = scoreToRadius(zone.urban_score);
+        const radius = Math.round(scoreToRadius(zone.urban_score) * radiusScale);
         const isAlert = zone.urban_score >= 55;
 
         if (isAlert) {
@@ -107,6 +124,7 @@ export default function ZoneMap({ zones }: Props) {
               pos={pos}
               color={color}
               score={zone.urban_score}
+              radius={radius}
               onClick={() => router.push(`/zones/${zone.zone_id}`)}
             />
           );
@@ -125,21 +143,13 @@ export default function ZoneMap({ zones }: Props) {
             }}
           >
             <Tooltip permanent direction="center" className="zone-label" offset={[0, 0]}>
-              <span style={{ fontSize: 11, fontWeight: 700, color, textShadow: "0 1px 3px #000", cursor: "pointer" }}>
+              <span style={{ fontSize: isMobile ? 9 : 11, fontWeight: 700, color, textShadow: "0 1px 3px #000", cursor: "pointer" }}>
                 {zone.urban_score}
               </span>
             </Tooltip>
           </CircleMarker>
         );
       })}
-
-      <style>{`
-        @keyframes pulse {
-          0%   { transform: scale(1);   opacity: 0.4; }
-          70%  { transform: scale(1.6); opacity: 0;   }
-          100% { transform: scale(1.6); opacity: 0;   }
-        }
-      `}</style>
     </MapContainer>
   );
 }

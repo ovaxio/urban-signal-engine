@@ -1,3 +1,14 @@
+/* ── Zone map ────────────────────────────────────────────────────────────── */
+
+.zone-map-container {
+  height: 280px;
+  width: 100%;
+  border-radius: 12px;
+  background: #13161f;
+}
+
+/* ── Tooltip overrides ───────────────────────────────────────────────────── */
+
 .zone-label {
   background: transparent !important;
   border: none !important;
@@ -13,4 +24,41 @@
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+/* ── Pulse animation ─────────────────────────────────────────────────────── */
+
+@keyframes pulse {
+  0%   { transform: scale(1);   opacity: 0.4; }
+  70%  { transform: scale(1.6); opacity: 0;   }
+  100% { transform: scale(1.6); opacity: 0;   }
+}
+
+/* ── Leaflet controls on mobile ──────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .leaflet-control-zoom {
+    transform: scale(0.85);
+    transform-origin: top left;
+  }
+}
+
+/* ── Responsive height ───────────────────────────────────────────────────── */
+
+@media (min-width: 481px) and (max-width: 767px) {
+  .zone-map-container {
+    height: 320px;
+  }
+}
+
+@media (min-width: 768px) {
+  .zone-map-container {
+    height: 420px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .zone-map-container {
+    height: 480px;
+  }
 }
