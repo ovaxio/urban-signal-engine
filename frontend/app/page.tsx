@@ -16,7 +16,7 @@ import AlertPanel      from "@/components/alert/AlertPanel";
 
 const ZoneMap = dynamic<{ zones: ZoneSummary[] }>(
   () => import("@/components/map/ZoneMap"),
-  { ssr: false, loading: () => <div style={{ height: 420, background: "#13161f", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", fontSize: 12 }}>Chargement de la carte…</div> }
+  { ssr: false, loading: () => <div style={{ height: 420, background: "var(--bg-inner)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)", fontSize: 12 }}>Chargement de la carte…</div> }
 );
 
 export default function Home() {
@@ -119,7 +119,7 @@ export default function Home() {
               {error && zones.length > 0 && (
                 <div style={{ background: "#f9731611", border: "1px solid #f9731633", borderRadius: 8, padding: "8px 14px", marginBottom: 12, fontSize: 11, color: "#f97316", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>{error}</span>
-                  <button onClick={loadLive} style={{ fontSize: 10, color: "#a5b4fc", background: "transparent", border: "none", cursor: "pointer" }}>Réessayer</button>
+                  <button onClick={loadLive} style={{ fontSize: 10, color: "var(--accent-text)", background: "transparent", border: "none", cursor: "pointer" }}>Réessayer</button>
                 </div>
               )}
 
@@ -134,7 +134,7 @@ export default function Home() {
               <FilterBar filter={filter} zones={zones} onFilterChange={setFilter} />
 
               {/* Map */}
-              <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #2d3148", marginBottom: 16 }} role="img" aria-label="Carte des zones urbaines de Lyon">
+              <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", marginBottom: 16 }} role="img" aria-label="Carte des zones urbaines de Lyon">
                 <ZoneMap zones={displayed} />
               </div>
 
@@ -145,7 +145,7 @@ export default function Home() {
               </div>
 
               {lastFetch && !simMode && (
-                <p style={{ marginTop: 12, fontSize: 10, color: "#64748b", textAlign: "right" }}>
+                <p style={{ marginTop: 12, fontSize: 10, color: "var(--text-muted)", textAlign: "right" }}>
                   Dernière mise à jour : {lastFetch.toLocaleTimeString("fr-FR")}
                 </p>
               )}
@@ -154,7 +154,7 @@ export default function Home() {
         </div>
       </main>
 
-      <footer style={{ background: "#13161f", borderTop: "1px solid #1e2235", padding: "8px 24px", fontSize: 10, color: "#64748b", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+      <footer style={{ background: "var(--bg-inner)", borderTop: "1px solid var(--bg-control)", padding: "8px 24px", fontSize: 10, color: "var(--text-muted)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
         <span>Urban Signal Engine · données ouvertes · Lyon</span>
         <span>UrbanScore = Φ·(wT·T + wM·M + wE·E + wP·P) + λ₂·A + λ₃·C + λ₄·S</span>
       </footer>

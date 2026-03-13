@@ -43,14 +43,14 @@ export default function AlertPanel() {
   const unread = alerts.filter(a => a.alert_type !== "CALME").length;
 
   return (
-    <div style={{ background: "#1a1d27", border: "1px solid #2d3148", borderRadius: 10, overflow: "hidden" }}>
+    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-controls="alert-list"
         style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", cursor: "pointer", userSelect: "none", width: "100%", background: "transparent", border: "none", color: "inherit", font: "inherit" }}
       >
-        <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: "0.1em", flex: 1, textAlign: "left" }}>
+        <span style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, letterSpacing: "0.1em", flex: 1, textAlign: "left" }}>
           ALERTES
         </span>
         {unread > 0 && (
@@ -58,20 +58,20 @@ export default function AlertPanel() {
             {unread}
           </span>
         )}
-        <span style={{ fontSize: 10, color: "#475569" }} aria-hidden="true">{open ? "▲" : "▼"}</span>
+        <span style={{ fontSize: 10, color: "var(--text-faint)" }} aria-hidden="true">{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
-        <div id="alert-list" role="region" aria-label="Liste des alertes" style={{ borderTop: "1px solid #2d3148" }}>
+        <div id="alert-list" role="region" aria-label="Liste des alertes" style={{ borderTop: "1px solid var(--border)" }}>
           {error ? (
-            <div style={{ padding: "14px", fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
+            <div style={{ padding: "14px", fontSize: 11, color: "var(--text-secondary)", textAlign: "center" }}>
               {error}
-              <button onClick={load} style={{ display: "block", margin: "6px auto 0", fontSize: 10, color: "#a5b4fc", background: "transparent", border: "none", cursor: "pointer" }}>
+              <button onClick={load} style={{ display: "block", margin: "6px auto 0", fontSize: 10, color: "var(--accent-text)", background: "transparent", border: "none", cursor: "pointer" }}>
                 Réessayer
               </button>
             </div>
           ) : alerts.length === 0 ? (
-            <div style={{ padding: "14px", fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
+            <div style={{ padding: "14px", fontSize: 11, color: "var(--text-secondary)", textAlign: "center" }}>
               Aucune alerte enregistrée.
             </div>
           ) : (
@@ -84,20 +84,20 @@ export default function AlertPanel() {
                   style={{
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "8px 14px",
-                    borderBottom: i < alerts.length - 1 ? "1px solid #1e2235" : undefined,
+                    borderBottom: i < alerts.length - 1 ? "1px solid var(--bg-control)" : undefined,
                     background: i === 0 ? `${meta.color}08` : undefined,
                   }}
                 >
                   <span style={{ fontSize: 13 }}>{meta.emoji}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: "#e2e8f0", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ fontSize: 11, color: "var(--text-primary)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {a.zone_name}
                     </div>
-                    <div style={{ fontSize: 9, color: "#475569", marginTop: 1 }}>
+                    <div style={{ fontSize: 9, color: "var(--text-faint)", marginTop: 1 }}>
                       {meta.label} · {a.prev_score} {dir} {a.urban_score}
                     </div>
                   </div>
-                  <div style={{ fontSize: 10, color: "#64748b", flexShrink: 0 }}>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>
                     {timeAgo(a.ts)}
                   </div>
                 </div>

@@ -43,30 +43,30 @@ export default function ZoneHistoryChart({ zoneId, limit = 48 }: Props) {
 
   const toggle = (key: string) => setVisible(v => ({ ...v, [key]: !v[key] }));
 
-  if (loading) return <p className="text-sm text-zinc-400">Chargement historique…</p>;
-  if (error)   return <p className="text-sm text-red-400">Erreur : {error}</p>;
-  if (!data.length) return <p className="text-sm text-zinc-400">Pas encore d'historique.</p>;
+  if (loading) return <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>Chargement historique…</p>;
+  if (error)   return <p style={{ fontSize: 13, color: "#ef4444" }}>Erreur : {error}</p>;
+  if (!data.length) return <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>Pas encore d'historique.</p>;
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-      <div className="mb-3 flex items-center justify-between flex-wrap gap-2">
+    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div>
-          <h2 className="text-sm font-semibold text-zinc-200">Historique — {data.length} relevés</h2>
-          <div className="mt-1 flex gap-4 text-xs text-zinc-500">
-            <span><span className="text-indigo-400 font-medium">Gauche</span> — Score (0–100)</span>
-            <span><span className="text-zinc-400 font-medium">Droite</span> — Signaux bruts</span>
+          <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Historique — {data.length} relevés</h2>
+          <div style={{ marginTop: 4, display: "flex", gap: 16, fontSize: 11, color: "var(--text-muted)" }}>
+            <span><span style={{ color: "#6366f1", fontWeight: 500 }}>Gauche</span> — Score (0–100)</span>
+            <span><span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>Droite</span> — Signaux bruts</span>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {SERIES.map(s => (
             <button
               key={s.key}
               onClick={() => toggle(s.key)}
-              className="flex items-center gap-1 rounded px-2 py-0.5 text-xs transition"
               style={{
+                display: "flex", alignItems: "center", gap: 4, borderRadius: 4, padding: "2px 8px", fontSize: 11, cursor: "pointer",
                 background: visible[s.key] ? s.color + "22" : "transparent",
-                color:      visible[s.key] ? s.color : "#71717a",
-                border:     `1px solid ${visible[s.key] ? s.color : "#3f3f46"}`,
+                color:      visible[s.key] ? s.color : "var(--text-muted)",
+                border:     `1px solid ${visible[s.key] ? s.color : "var(--border)"}`,
               }}
             >
               {s.label}

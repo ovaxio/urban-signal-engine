@@ -4,7 +4,7 @@
   height: 280px;
   width: 100%;
   border-radius: 12px;
-  background: #13161f;
+  background: var(--bg-inner);
 }
 
 /* ── Tooltip overrides ───────────────────────────────────────────────────── */

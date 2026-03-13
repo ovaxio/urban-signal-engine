@@ -2,6 +2,7 @@
 
 import type { HealthStatus } from "@/domain/types";
 import styles from "./DashboardHeader.module.css";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 type Props = {
   simMode: boolean;
@@ -42,16 +43,19 @@ export default function DashboardHeader({
           </div>
 
           {/* Health — compact, always top-right */}
-          {!simMode && health && (
-            <div className={styles.health}>
-              <span className={styles.healthText}>{dot} {age}s</span>
-              <button
-                onClick={onRefresh}
-                aria-label="Rafraîchir les données"
-                className={styles.refreshBtn}
-              >↻</button>
-            </div>
-          )}
+          <div className={styles.health}>
+            {!simMode && health && (
+              <>
+                <span className={styles.healthText}>{dot} {age}s</span>
+                <button
+                  onClick={onRefresh}
+                  aria-label="Rafraîchir les données"
+                  className={styles.refreshBtn}
+                >↻</button>
+              </>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
 
         {/* Row 2: Simulation controls */}

@@ -1,8 +1,8 @@
 /* ── DashboardHeader ─────────────────────────────────────────────────────── */
 
 .header {
-  background: #1a1d27;
-  border-bottom: 1px solid #2d3148;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
   padding: 10px 16px;
 }
 
@@ -66,8 +66,8 @@
 
 .badgeLive {
   font-size: 11px;
-  color: #64748b;
-  background: #1e2235;
+  color: var(--text-muted);
+  background: var(--bg-control);
   padding: 2px 8px;
   border-radius: 4px;
   white-space: nowrap;
@@ -85,15 +85,15 @@
 
 .healthText {
   font-size: 11px;
-  color: #64748b;
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
 .refreshBtn {
   font-size: 14px;
-  color: #94a3b8;
-  background: #1e2235;
-  border: 1px solid #2d3148;
+  color: var(--text-secondary);
+  background: var(--bg-control);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 4px 10px;
   cursor: pointer;
@@ -122,9 +122,9 @@
 
 .dateInput {
   font-size: 12px;
-  color: #94a3b8;
-  background: #1e2235;
-  border: 1px solid #2d3148;
+  color: var(--text-secondary);
+  background: var(--bg-control);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 10px;
   cursor: pointer;
@@ -173,7 +173,7 @@
 }
 
 .eventsLabel {
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .eventTag {

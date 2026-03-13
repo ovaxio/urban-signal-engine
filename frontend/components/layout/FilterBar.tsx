@@ -24,9 +24,10 @@ export default function FilterBar({ filter, zones, onFilterChange }: Props) {
             aria-pressed={filter === f.key}
             style={{
               fontSize: 11, fontWeight: 600, padding: "8px 16px", borderRadius: 6, cursor: "pointer", minHeight: 36,
-              border: filter === f.key ? "1px solid #6366f1" : "1px solid #2d3148",
-              background: filter === f.key ? "#6366f122" : "#1e2235",
-              color: filter === f.key ? "#a5b4fc" : "#94a3b8",
+              border: filter === f.key ? "1px solid var(--accent)" : "1px solid var(--border)",
+              background: filter === f.key ? "var(--accent)" : "var(--bg-control)",
+              color: filter === f.key ? "var(--accent-text)" : "var(--text-secondary)",
+              opacity: filter === f.key ? 0.85 : 1,
             }}
           >
             {f.label}{count !== undefined ? ` (${count})` : ""}

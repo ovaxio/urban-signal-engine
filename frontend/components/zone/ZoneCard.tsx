@@ -16,7 +16,7 @@ export default function ZoneCard({ zone, simDate }: Props) {
   return (
     <Link href={href}>
       <div className="zone-card" style={{
-        background: isAlert ? `${col}0d` : "#1a1d27",
+        background: isAlert ? `${col}0d` : "var(--bg-card)",
         border: `1px solid ${col}${isAlert ? "66" : "33"}`,
         borderRadius: 10,
         padding: "14px 16px",
@@ -28,7 +28,7 @@ export default function ZoneCard({ zone, simDate }: Props) {
         <ScoreBar pct={zone.urban_score} color={col} />
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{zone.zone_name}</div>
+          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{zone.zone_name}</div>
           {isAlert && <div style={{ width: 6, height: 6, borderRadius: "50%", background: col, boxShadow: `0 0 5px ${col}`, flexShrink: 0 }} />}
         </div>
 
@@ -38,9 +38,9 @@ export default function ZoneCard({ zone, simDate }: Props) {
         <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 2 }}>
           {(zone.top_causes ?? []).length > 0
             ? zone.top_causes.slice(0, 2).map((c, i) => (
-                <div key={i} style={{ fontSize: 9, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>▸ {c}</div>
+                <div key={i} style={{ fontSize: 9, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>▸ {c}</div>
               ))
-            : <div style={{ fontSize: 9, color: "#94a3b8", fontStyle: "italic" }}>Conditions normales</div>
+            : <div style={{ fontSize: 9, color: "var(--text-secondary)", fontStyle: "italic" }}>Conditions normales</div>
           }
         </div>
       </div>

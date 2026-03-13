@@ -36,8 +36,8 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
 
   if (!detail) return (
     <div style={{ padding: 40, textAlign: "center" }}>
-      <div style={{ fontSize: 14, color: "#94a3b8", marginBottom: 12 }}>Zone introuvable ou backend indisponible.</div>
-      <Link href="/" style={{ color: "#a5b4fc", fontSize: 12 }}>← Retour au tableau de bord</Link>
+      <div style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 12 }}>Zone introuvable ou backend indisponible.</div>
+      <Link href="/" style={{ color: "var(--accent-text)", fontSize: 12 }}>← Retour au tableau de bord</Link>
     </div>
   );
 
@@ -47,15 +47,15 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
     <div style={{ minHeight: "100vh" }}>
 
       {/* Header */}
-      <header style={{ background: "#1a1d27", borderBottom: "1px solid #2d3148", padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-        <Link href={backHref} style={{ color: "#64748b", fontSize: 12 }}>← Toutes les zones</Link>
+      <header style={{ background: "var(--bg-card)", borderBottom: "1px solid var(--border)", padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <Link href={backHref} style={{ color: "var(--text-muted)", fontSize: 12 }}>← Toutes les zones</Link>
         <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: "0.06em" }}>URBAN SIGNAL ENGINE</span>
         {isSimMode ? (
           <span style={{ marginLeft: "auto", fontSize: 11, color: "#f97316", background: "#f9731611", border: "1px solid #f9731633", padding: "2px 10px", borderRadius: 4 }}>
             SIMULATION · {simDate}
           </span>
         ) : (
-          <span style={{ marginLeft: "auto", fontSize: 11, color: "#64748b" }}>
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>
             Live · refresh serveur à chaque requête
           </span>
         )}
