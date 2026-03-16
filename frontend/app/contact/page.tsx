@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import s from "../landing.module.css";
+import MarketingNav from "@/components/layout/MarketingNav";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -41,12 +42,7 @@ export default function ContactPage() {
 
   return (
     <div className={s.page}>
-      <nav className={s.nav}>
-        <Link href="/" className={s.navLogo}>
-          Urban Signal <span>Engine</span>
-        </Link>
-        <div />
-      </nav>
+      <MarketingNav />
 
       <article className={s.legalPage}>
         <h1 className={s.legalTitle}>Nous contacter</h1>

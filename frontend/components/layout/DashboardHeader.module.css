@@ -30,6 +30,8 @@
   gap: 8px;
   min-width: 0;
   overflow: hidden;
+  text-decoration: none;
+  color: inherit;
 }
 
 .statusDot {

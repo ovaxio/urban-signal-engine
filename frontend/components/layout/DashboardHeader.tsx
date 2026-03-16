@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { HealthStatus } from "@/domain/types";
 import styles from "./DashboardHeader.module.css";
 import ThemeToggle from "@/components/theme/ThemeToggle";
@@ -29,8 +30,8 @@ export default function DashboardHeader({
 
         {/* Row 1: Logo + Health (always visible) */}
         <div className={styles.topRow}>
-          <div className={styles.brand}>
-            <div
+          <Link href="/dashboard" className={styles.brand}>
+            <span
               className={styles.statusDot}
               style={{ background: simMode ? "#f97316" : "#22c55e", boxShadow: `0 0 8px ${simMode ? "#f97316" : "#22c55e"}` }}
             />
@@ -40,7 +41,7 @@ export default function DashboardHeader({
               ? <span className={styles.badgeSim}>SIMULATION · {simDate}</span>
               : <span className={styles.badgeLive}>LYON · LIVE</span>
             }
-          </div>
+          </Link>
 
           {/* Health — compact, always top-right */}
           <div className={styles.health}>

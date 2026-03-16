@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import s from "./landing.module.css";
+import MarketingNav from "@/components/layout/MarketingNav";
 
 /* ── Mock terminal data ─────────────────────────────────────────────────────── */
 
@@ -111,17 +112,7 @@ export default function MarketingPage() {
   return (
     <div className={s.page}>
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
-      <nav className={s.nav}>
-        <div className={s.navLogo}>
-          Urban Signal <span>Engine</span>
-        </div>
-        <ul className={s.navLinks}>
-          <li><a href="#probleme">Problème</a></li>
-          <li><a href="#fonctionnalites">Fonctionnalités</a></li>
-          <li><a href="#methode">Méthode</a></li>
-        </ul>
-        <Link href="/contact"><button className={s.navCta}>Nous contacter</button></Link>
-      </nav>
+      <MarketingNav showAnchors showCta />
 
       {/* ── Hero ────────────────────────────────────────────────────────── */}
       <section className={s.hero}>
