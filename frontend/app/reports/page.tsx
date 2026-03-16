@@ -1,5 +1,6 @@
 import { fetchEvents } from "@/lib/api";
 import type { CalendarEvent } from "@/domain/types";
+import AppHeader from "@/components/layout/AppHeader";
 import AppNav from "@/components/layout/AppNav";
 import ReportViewer from "@/components/report/ReportViewer";
 
@@ -17,24 +18,7 @@ export default async function ReportsPage() {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <header
-        style={{
-          background: "var(--bg-card)",
-          borderBottom: "1px solid var(--border)",
-          padding: "12px 24px",
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: "0.06em" }}>
-          URBAN SIGNAL ENGINE
-        </span>
-        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-          RAPPORTS D&apos;IMPACT
-        </span>
-      </header>
+      <AppHeader label="RAPPORTS D'IMPACT" />
       <AppNav />
 
       <main

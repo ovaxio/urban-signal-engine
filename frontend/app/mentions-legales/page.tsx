@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import s from "../landing.module.css";
 import Link from "next/link";
+import MarketingNav from "@/components/layout/MarketingNav";
 
 export const metadata: Metadata = {
   title: "Mentions légales · Urban Signal Engine",
@@ -10,12 +11,7 @@ export const metadata: Metadata = {
 export default function MentionsLegales() {
   return (
     <div className={s.page}>
-      <nav className={s.nav}>
-        <Link href="/" className={s.navLogo}>
-          Urban Signal <span>Engine</span>
-        </Link>
-        <div />
-      </nav>
+      <MarketingNav />
 
       <article className={s.legalPage}>
         <h1 className={s.legalTitle}>Mentions légales</h1>

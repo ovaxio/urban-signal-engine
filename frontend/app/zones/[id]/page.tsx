@@ -9,6 +9,7 @@ import ZoneForecast       from "@/components/zone/ZoneForecast";
 import ZoneNeighbors      from "@/components/zone/ZoneNeighbors";
 import ZoneIncidents      from "@/components/zone/ZoneIncidents";
 import SimBanner          from "@/components/layout/SimBanner";
+import AppHeader          from "@/components/layout/AppHeader";
 import AppNav             from "@/components/layout/AppNav";
 import ZoneHistoryChart   from "@/components/chart/ZoneHistoryChart";
 
@@ -50,19 +51,20 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
     <div style={{ minHeight: "100vh" }}>
 
       {/* Header */}
-      <header style={{ background: "var(--bg-card)", borderBottom: "1px solid var(--border)", padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-        <Link href={backHref} style={{ color: "var(--text-muted)", fontSize: 12 }}>← Toutes les zones</Link>
-        <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: "0.06em" }}>URBAN SIGNAL ENGINE</span>
-        {isSimMode ? (
-          <span style={{ marginLeft: "auto", fontSize: 11, color: "#f97316", background: "#f9731611", border: "1px solid #f9731633", padding: "2px 10px", borderRadius: 4 }}>
-            SIMULATION · {simDate}
-          </span>
-        ) : (
-          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>
-            Live · refresh serveur à chaque requête
-          </span>
-        )}
-      </header>
+      <AppHeader
+        back={{ href: backHref, text: "Toutes les zones" }}
+        right={
+          isSimMode ? (
+            <span style={{ fontSize: 11, color: "#f97316", background: "#f9731611", border: "1px solid #f9731633", padding: "2px 10px", borderRadius: 4 }}>
+              SIMULATION · {simDate}
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              Live
+            </span>
+          )
+        }
+      />
       <AppNav />
 
       {/* Simulation event banner */}
