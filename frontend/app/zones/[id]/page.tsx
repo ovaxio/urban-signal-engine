@@ -9,6 +9,7 @@ import ZoneForecast       from "@/components/zone/ZoneForecast";
 import ZoneNeighbors      from "@/components/zone/ZoneNeighbors";
 import ZoneIncidents      from "@/components/zone/ZoneIncidents";
 import SimBanner          from "@/components/layout/SimBanner";
+import AppNav             from "@/components/layout/AppNav";
 import ZoneHistoryChart   from "@/components/chart/ZoneHistoryChart";
 
 type PageProps = {
@@ -39,11 +40,11 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
   if (!detail) return (
     <div style={{ padding: 40, textAlign: "center" }}>
       <div style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 12 }}>Zone introuvable ou backend indisponible.</div>
-      <Link href="/" style={{ color: "var(--accent-text)", fontSize: 12 }}>← Retour au tableau de bord</Link>
+      <Link href="/dashboard" style={{ color: "var(--accent-text)", fontSize: 12 }}>← Retour au tableau de bord</Link>
     </div>
   );
 
-  const backHref = isSimMode ? `/?sim=${simDate}` : "/";
+  const backHref = isSimMode ? `/dashboard?sim=${simDate}` : "/dashboard";
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -62,6 +63,7 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
           </span>
         )}
       </header>
+      <AppNav />
 
       {/* Simulation event banner */}
       {isSimMode && detail.sim_events && detail.sim_events.length > 0 && (

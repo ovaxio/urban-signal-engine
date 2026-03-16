@@ -330,6 +330,63 @@ def get_calibration_baselines_per_zone(
     return result
 
 
+# ─── Impact Report ────────────────────────────────────────────────────────────
+
+def get_history_range(
+    start: str,
+    end: str,
+    zone_id: Optional[str] = None,
+    db_path: Path = DB_PATH,
+) -> list[dict[str, Any]]:
+    """
+    Retourne l'historique entre start et end (ISO).
+    Si zone_id est fourni, filtre sur cette zone.
+    """
+    if zone_id:
+        sql = """
+            SELECT ts, zone_id, traffic, weather, event, transport,
+                   raw_traffic, raw_weather, raw_event, raw_transport, raw_incident,
+                   urban_score, level
+            FROM   signals_history
+            WHERE  ts >= ? AND ts <= ? AND zone_id = ?
+            ORDER  BY ts ASC
+        """
+        params: tuple = (start, end, zone_id)
+    else:
+        sql = """
+            SELECT ts, zone_id, traffic, weather, event, transport,
+                   raw_traffic, raw_weather, raw_event, raw_transport, raw_incident,
+                   urban_score, level
+            FROM   signals_history
+            WHERE  ts >= ? AND ts <= ?
+            ORDER  BY ts ASC
+        """
+        params = (start, end)
+
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_alerts_range(
+    start: str,
+    end: str,
+    db_path: Path = DB_PATH,
+) -> list[dict[str, Any]]:
+    """Retourne les alertes entre start et end (ISO)."""
+    sql = """
+        SELECT ts, zone_id, zone_name, alert_type, urban_score, prev_score, level
+        FROM   alerts_log
+        WHERE  ts >= ? AND ts <= ?
+        ORDER  BY ts ASC
+    """
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, (start, end)).fetchall()
+    return [dict(r) for r in rows]
+
+
 # ─── Alertes ───────────────────────────────────────────────────────────────────
 
 def save_alerts(alerts: list[dict[str, Any]], db_path: Path = DB_PATH) -> int:
@@ -396,7 +453,7 @@ def _build_row(entry: dict[str, Any], ts_fallback: str) -> dict[str, Any]:
         "transport":     signals.get("transport"),
         # bruts (nouveaux)
         "raw_traffic":   raw_signals.get("traffic"),
-        "raw_weather":   raw_signals.get("raw_weather") or raw_signals.get("weather"),
+        "raw_weather":   raw_signals.get("weather"),
         "raw_event":     raw_signals.get("event"),
         "raw_transport": raw_signals.get("transport"),
         "raw_incident":  raw_signals.get("incident"),

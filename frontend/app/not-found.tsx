@@ -8,7 +8,7 @@ export default function NotFound() {
         La page demandée n'existe pas.
       </p>
       <Link href="/" style={{ color: "var(--accent-text)", fontSize: 12 }}>
-        ← Retour au tableau de bord
+        ← Retour à l&apos;accueil
       </Link>
     </div>
   );

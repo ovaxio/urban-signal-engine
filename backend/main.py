@@ -28,6 +28,7 @@ from slowapi.errors import RateLimitExceeded
 from routers.zones import router as zones_router, _get_scores
 from routers.contact import router as contact_router
 from routers.admin import router as admin_router
+from routers.reports import router as reports_router
 from config import CACHE_TTL_SECONDS
 from services.storage import init_db, get_calibration_baselines, get_calibration_baselines_per_zone
 from services.auth import init_auth_db
@@ -187,6 +188,7 @@ async def add_security_headers(request: Request, call_next):
 app.include_router(zones_router)
 app.include_router(contact_router)
 app.include_router(admin_router)
+app.include_router(reports_router)
 
 
 @app.get("/health", tags=["system"])
