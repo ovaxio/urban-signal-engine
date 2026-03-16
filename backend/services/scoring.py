@@ -115,6 +115,11 @@ def compute_anomaly(signals: dict, bl: Dict = None) -> float:
     return sum(ALPHA[s] * max(normalize(v, s, bl), 0.0) for s, v in signals.items())
 
 
+def _soft_gate(z: float, theta: float, k: float = 4.0) -> float:
+    """Sigmoid soft-gate: 0 quand z << θ, ~1 quand z >> θ, 0.5 à z=θ."""
+    return 1.0 / (1.0 + math.exp(-k * (z - theta)))
+
+
 def compute_conv(signals: dict, bl: Dict = None) -> float:
     S = {s: normalize(v, s, bl) for s, v in signals.items()}
     pairs = [
@@ -130,7 +135,7 @@ def compute_conv(signals: dict, bl: Dict = None) -> float:
         ("transport", "incident",  "transport_incident"),
     ]
     return sum(
-        BETA[k] * (S[a] > THETA[a]) * (S[b] > THETA[b])
+        BETA[k] * _soft_gate(S[a], THETA[a]) * _soft_gate(S[b], THETA[b])
         for a, b, k in pairs
     )
 
@@ -148,7 +153,10 @@ def compute_spread(zone_id: str, alert_map: dict) -> float:
 
 def compute_urban_score(alert: float, spread: float) -> int:
     raw = alert + LAMBDA["l4"] * spread
-    normalized = (raw + 2.0) / 7.0
+    # Sigmoid mapping — préserve les seuils existants (CALME/MODÉRÉ/TENDU/CRITIQUE)
+    # tout en étirant la plage haute pour mieux différencier TENDU et CRITIQUE.
+    # Centre=1.5, k=0.6 → baseline(raw=0)≈29, TENDU à raw≈1.85, CRITIQUE à raw≈3.04
+    normalized = 1.0 / (1.0 + math.exp(-0.6 * (raw - 1.5)))
     return int(max(0, min(100, normalized * 100)))
 
 
@@ -209,17 +217,18 @@ def compute_forecast(
     for h in FORECAST_HORIZONS:
         future_dt  = dt + timedelta(minutes=h)
         phi_future = compute_phi(future_dt)
-        phi_ratio  = phi_future / phi_now
+        # Ratio phi cappé pour éviter qu'une nuit calme prédise TENDU au rush
+        phi_ratio  = min(phi_future / phi_now, 1.4)
 
         # Decay lent (tau=240) pour permettre au phi rush hour de compenser
         decay = math.exp(-h / 240)
 
-        # Composante tendance — atténuée sur le long terme, clampée
+        # Composante tendance — pondérée pour avoir un impact réel sur le score
         trend_decay   = math.exp(-h / 60)
-        trend_contrib = max(-0.5, min(0.5, trend * h * trend_decay))
+        trend_contrib = max(-1.0, min(1.0, trend * h * trend_decay))
 
         fa  = alert * decay * phi_ratio
-        fa += trend_contrib * 0.05
+        fa += trend_contrib * 0.3
 
         # Remplacement incident planifié : si schedule disponible, on ne decay pas
         # l'incident — on utilise la valeur réelle à ce horizon depuis Criter
@@ -271,7 +280,7 @@ def score_zone(zone_id: str, signals: dict, alert_map: dict, dt: datetime = None
         },
         "top_causes":  top_causes(signals, bl=bl),
         "alert":       alert,
-        "timestamp":   datetime.now(timezone.utc).isoformat(),
+        "timestamp":   (dt or datetime.now(timezone.utc)).isoformat(),
     }
 
 

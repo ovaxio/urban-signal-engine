@@ -85,3 +85,64 @@ export type HistoryPoint = {
 };
 
 export type FilterLevel = "all" | "TENDU" | "CRITIQUE";
+
+// ── Impact Report ───────────────────────────────────────────────────────────
+
+export type ImpactZone = {
+  zone_name: string;
+  data_points: number;
+  peak_score: number;
+  peak_level: string;
+  peak_at: string;
+  avg_score: number;
+  level_distribution: Record<string, number>;
+  readings_tendu: number;
+  readings_critique: number;
+  signal_averages_normalized: Record<string, number>;
+  raw_signal_averages: Record<string, number>;
+  baseline_avg_score: number | null;
+  delta_vs_baseline: number | null;
+};
+
+export type ImpactSummary = {
+  total_data_points: number;
+  zones_analyzed: number;
+  global_avg_score: number;
+  global_peak_score: number;
+  global_peak_zone: string;
+  global_peak_at: string;
+  global_peak_level: string;
+  baseline_avg_score: number | null;
+  delta_vs_baseline: number | null;
+  total_alerts: number;
+  alerts_critique: number;
+  alerts_tendu: number;
+};
+
+export type ImpactTopZone = {
+  zone_id: string;
+  zone_name: string;
+  avg_score: number;
+  peak_score: number;
+  peak_level: string;
+};
+
+export type ImpactReport = {
+  report_type: string;
+  event_name: string | null;
+  period: { start: string; end: string };
+  baseline_period: { start: string; end: string } | null;
+  summary: ImpactSummary;
+  top_impacted_zones: ImpactTopZone[];
+  zones: Record<string, ImpactZone>;
+  alerts: Alert[];
+};
+
+export type CalendarEvent = {
+  name: string;
+  start: string;
+  end: string;
+  zone: string;
+  zone_name: string;
+  weight: number;
+};

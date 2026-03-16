@@ -48,3 +48,27 @@ export async function fetchAlerts(limit = 20) {
   if (!r.ok) throw new Error(`/zones/alerts ${r.status}`);
   return r.json();
 }
+
+export async function fetchImpactReport(params: {
+  start: string; end: string;
+  baseline_start?: string; baseline_end?: string;
+}) {
+  const q = new URLSearchParams({ start: params.start, end: params.end });
+  if (params.baseline_start) q.set("baseline_start", params.baseline_start);
+  if (params.baseline_end) q.set("baseline_end", params.baseline_end);
+  const r = await fetch(`${BASE}/reports/impact?${q}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`/reports/impact ${r.status}`);
+  return r.json();
+}
+
+export async function fetchEventImpact(eventName: string) {
+  const r = await fetch(`${BASE}/reports/impact/event/${encodeURIComponent(eventName)}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`/reports/impact/event ${r.status}`);
+  return r.json();
+}
+
+export async function fetchEvents() {
+  const r = await fetch(`${BASE}/reports/events`, { next: { revalidate: 3600 } });
+  if (!r.ok) throw new Error(`/reports/events ${r.status}`);
+  return r.json();
+}

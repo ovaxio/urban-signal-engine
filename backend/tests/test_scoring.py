@@ -169,9 +169,11 @@ class TestComputeRisk:
 # ─── compute_conv ──────────────────────────────────────────────────────────────
 
 class TestComputeConv:
-    def test_no_convergence_below_threshold(self):
-        assert compute_conv(SIGNALS_CALM)    == 0.0
-        assert compute_conv(SIGNALS_NEUTRAL) == 0.0
+    def test_negligible_convergence_below_threshold(self):
+        # Soft-gate sigmoid produit des valeurs infinitésimales sous le seuil
+        # Convergence négligeable (< 0.01) quand aucun signal ne dépasse θ
+        assert compute_conv(SIGNALS_CALM)    < 0.01
+        assert compute_conv(SIGNALS_NEUTRAL) < 0.01
 
     def test_fete_triggers_convergence(self):
         """Fête des Lumières : trafic + event + transport tous très élevés."""
