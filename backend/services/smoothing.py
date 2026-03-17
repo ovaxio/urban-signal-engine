@@ -69,13 +69,15 @@ def smooth_signals(
         dict signal → valeur lissée (même structure que `current`)
     """
     try:
-        rows = get_zone_history(zone_id, limit=window)
+        # source='live' → exclut les données seed pour éviter un saut
+        # artificiel entre le seed (données pré-deploy) et les données live.
+        rows = get_zone_history(zone_id, limit=window, source="live")
     except Exception as e:
         log.warning("smooth_signals(%s) : erreur lecture historique — %s", zone_id, e)
         return current
 
     if len(rows) < MIN_ROWS:
-        log.debug("smooth_signals(%s) : historique insuffisant (%d rows) — pas de lissage", zone_id, len(rows))
+        log.debug("smooth_signals(%s) : historique live insuffisant (%d rows) — pas de lissage", zone_id, len(rows))
         return current
 
     # rows trié du plus récent au plus ancien → on inverse

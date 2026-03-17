@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS signals_history (
     raw_weather       REAL,
     raw_event         REAL,
     raw_transport     REAL,
-    raw_incident      REAL
+    raw_incident      REAL,
+    source            TEXT    DEFAULT 'live'
 );
 """
 
@@ -90,6 +91,7 @@ MIGRATE_ADD_RAW_COLUMNS = [
     "ALTER TABLE signals_history ADD COLUMN raw_event     REAL;",
     "ALTER TABLE signals_history ADD COLUMN raw_transport REAL;",
     "ALTER TABLE signals_history ADD COLUMN raw_incident  REAL;",
+    "ALTER TABLE signals_history ADD COLUMN source        TEXT DEFAULT 'live';",
 ]
 
 
@@ -155,11 +157,11 @@ def _seed_signals_history(conn: sqlite3.Connection, db_path: Path = DB_PATH) -> 
     delta = now - max_ts
     logger.info("Seed ts shift : max_ts=%s, now=%s, delta=%s", max_ts.isoformat(), now.isoformat(), delta)
 
-    # ── Passe 2 : insertion avec timestamps décalés ──
+    # ── Passe 2 : insertion avec timestamps décalés, source='seed' ──
     cols = (
         "ts", "zone_id", "traffic", "weather", "event", "transport",
         "urban_score", "level", "raw_traffic", "raw_weather",
-        "raw_event", "raw_transport", "raw_incident",
+        "raw_event", "raw_transport", "raw_incident", "source",
     )
     numeric = {
         "traffic", "weather", "event", "transport", "urban_score",
@@ -175,6 +177,9 @@ def _seed_signals_history(conn: sqlite3.Connection, db_path: Path = DB_PATH) -> 
         for row in reader:
             values = []
             for c in cols:
+                if c == "source":
+                    values.append("seed")
+                    continue
                 v = row.get(c, "")
                 if v == "":
                     values.append(None)
@@ -186,7 +191,7 @@ def _seed_signals_history(conn: sqlite3.Connection, db_path: Path = DB_PATH) -> 
                 else:
                     values.append(v)
             batch.append(tuple(values))
-            if len(batch) >= 2000:  # SQLite max params = 32767 / 13 cols ≈ 2520
+            if len(batch) >= 2000:
                 conn.executemany(sql, batch)
                 inserted += len(batch)
                 batch.clear()
@@ -292,20 +297,27 @@ def save_scores_history(
 def get_zone_history(
     zone_id: str,
     limit: int = 200,
+    source: Optional[str] = None,
     db_path: Path = DB_PATH,
 ) -> list[dict[str, Any]]:
-    sql = """
+    where = "WHERE zone_id = ?"
+    params: list = [zone_id]
+    if source:
+        where += " AND source = ?"
+        params.append(source)
+    sql = f"""
         SELECT ts, zone_id, traffic, weather, event, transport,
                raw_traffic, raw_weather, raw_event, raw_transport, raw_incident,
-               urban_score, level
+               urban_score, level, source
         FROM   signals_history
-        WHERE  zone_id = ?
+        {where}
         ORDER  BY ts DESC
         LIMIT  ?
     """
+    params.append(limit)
     with _get_conn(db_path) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute(sql, (zone_id, limit)).fetchall()
+        rows = conn.execute(sql, params).fetchall()
     return [dict(r) for r in rows]
 
 

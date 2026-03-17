@@ -768,6 +768,7 @@ async def fetch_all_signals() -> tuple:
     )
     incident_t, incident_schedule, incident_events = incident_result
 
+    transport_detail: Dict[str, Dict[str, Any]] = {}
     try:
         parcrelais, passages, velov = await asyncio.gather(
             _fetch_parcrelais(), _fetch_passages(), _fetch_velov()
@@ -779,10 +780,29 @@ async def fetch_all_signals() -> tuple:
                 + velov.get(zone, 0.5)     * 0.2,
                 4,
             )
+        for z in ZONE_CENTROIDS:
+            pr = round(parcrelais.get(z, 0.35), 3)
+            pa = round(passages.get(z, 0.0), 3)
+            vl = round(velov.get(z, 0.5), 3)
+            transport_detail[z] = {
+                "parcrelais": pr,
+                "passages_tcl": pa,
+                "velov": vl,
+                "score": _transport_score(z),
+                "fallback": False,
+            }
     except Exception as e:
         log.warning(f"[fetch_all_signals] transport fallback: {e}")
         def _transport_score(zone: str) -> float:
             return _deterministic_fallback(zone)
+        for z in ZONE_CENTROIDS:
+            transport_detail[z] = {
+                "parcrelais": None,
+                "passages_tcl": None,
+                "velov": None,
+                "score": _transport_score(z),
+                "fallback": True,
+            }
 
     result = {}
     for zone in ZONE_CENTROIDS:
@@ -809,4 +829,4 @@ async def fetch_all_signals() -> tuple:
         }
         log.info("[smoothing] EWM appliqué sur %d zones.", len(result))
 
-    return result, incident_schedule, incident_events, weather_fc
+    return result, incident_schedule, incident_events, weather_fc, transport_detail

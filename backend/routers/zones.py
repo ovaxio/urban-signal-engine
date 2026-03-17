@@ -27,6 +27,7 @@ _cache: dict = {
     "incident_schedule": {},   # Dict[zone_id, Dict[int, float]] — incidents planifiés
     "incident_events":   {},   # Dict[zone_id, List[dict]]        — détails événements actifs
     "weather_forecast":  {},   # Dict[str, float]                  — météo horaire prévue (48h)
+    "transport_detail":  {},   # Dict[zone_id, dict]               — détail sous-composantes transport
     "fetched_at":        None,
     "lock":              asyncio.Lock(),
     "prev_scores":       {},   # snapshot des scores du cycle précédent pour calcul tendance
@@ -46,7 +47,7 @@ async def _get_scores(force_refresh: bool = False) -> List[dict]:
                     z["zone_id"]: z["urban_score"] for z in _cache["scores"]
                 }
 
-            signals, incident_schedule, incident_events, weather_fc = await fetch_all_signals()
+            signals, incident_schedule, incident_events, weather_fc, transport_detail = await fetch_all_signals()
             scores  = score_all_zones(signals)
 
             if ENABLE_HISTORY:
@@ -66,6 +67,7 @@ async def _get_scores(force_refresh: bool = False) -> List[dict]:
             _cache["incident_schedule"] = incident_schedule
             _cache["incident_events"]   = incident_events
             _cache["weather_forecast"]  = weather_fc
+            _cache["transport_detail"]  = transport_detail
             _cache["fetched_at"]        = now
 
     return _cache["scores"]
@@ -125,6 +127,7 @@ async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
         "explanation":     explanation,
         "neighbors":       neighbors,
         "incident_events": _cache["incident_events"].get(zone_id, []),
+        "transport_detail": _cache["transport_detail"].get(zone_id),
     }
 
 

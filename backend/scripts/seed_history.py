@@ -285,11 +285,11 @@ def main():
         INSERT INTO signals_history
             (ts, zone_id, traffic, weather, event, transport,
              raw_traffic, raw_weather, raw_event, raw_transport, raw_incident,
-             urban_score, level)
+             urban_score, level, source)
         VALUES
             (:ts, :zone_id, :traffic, :weather, :event, :transport,
              :raw_traffic, :raw_weather, :raw_event, :raw_transport, :raw_incident,
-             :urban_score, :level)
+             :urban_score, :level, 'seed')
     """
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA journal_mode=WAL;")
