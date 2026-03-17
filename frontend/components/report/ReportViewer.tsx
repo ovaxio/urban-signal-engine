@@ -97,70 +97,6 @@ export default function ReportViewer({ events }: Props) {
         </button>
       </div>
 
-      {/* Event selector */}
-      {mode === "event" && (
-        <div
-          style={{
-            background: "var(--bg-card)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            padding: 16,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--text-secondary)",
-              letterSpacing: "0.06em",
-              marginBottom: 12,
-            }}
-          >
-            CALENDRIER DES ÉVÉNEMENTS LYON 2026
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {events.map((ev) => (
-              <button
-                key={ev.name}
-                onClick={() => loadEventReport(ev.name)}
-                disabled={loading}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-inner)",
-                  cursor: loading ? "wait" : "pointer",
-                  textAlign: "left",
-                  transition: "border-color 0.15s",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-                    {ev.name}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                    {ev.zone_name} · {ev.start} → {ev.end}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    padding: "2px 8px",
-                    borderRadius: 4,
-                    background: "var(--bg-control)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  poids {ev.weight}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Custom period form */}
       {mode === "custom" && (
         <div
@@ -231,7 +167,7 @@ export default function ReportViewer({ events }: Props) {
         </div>
       )}
 
-      {/* Loading / Error */}
+      {/* Loading / Error — au-dessus du contenu pour visibilité immédiate */}
       {loading && (
         <div
           style={{
@@ -244,7 +180,7 @@ export default function ReportViewer({ events }: Props) {
           Analyse en cours...
         </div>
       )}
-      {error && (
+      {error && !loading && (
         <div
           style={{
             padding: 16,
@@ -261,6 +197,70 @@ export default function ReportViewer({ events }: Props) {
 
       {/* Report */}
       {report && !loading && <ImpactReportView report={report} />}
+
+      {/* Event selector — en bas, après le résultat */}
+      {mode === "event" && (
+        <div
+          style={{
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--text-secondary)",
+              letterSpacing: "0.06em",
+              marginBottom: 12,
+            }}
+          >
+            CALENDRIER DES ÉVÉNEMENTS LYON 2026
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {events.map((ev) => (
+              <button
+                key={ev.name}
+                onClick={() => loadEventReport(ev.name)}
+                disabled={loading}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-inner)",
+                  cursor: loading ? "wait" : "pointer",
+                  textAlign: "left",
+                  transition: "border-color 0.15s",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                    {ev.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                    {ev.zone_name} · {ev.start} → {ev.end}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    padding: "2px 8px",
+                    borderRadius: 4,
+                    background: "var(--bg-control)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  poids {ev.weight}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }
