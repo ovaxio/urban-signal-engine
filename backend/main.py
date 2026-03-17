@@ -78,23 +78,20 @@ async def _calibration_loop():
         await asyncio.sleep(INTERVAL_DAYS * 24 * 3600)
 
 
-# Valeurs hardcodées à ne jamais écraser depuis SQLite :
-# - event   : non-stationnaire (calendrier statique)
-# - traffic : seed génère ~1.0 (flux libre) ≠ TomTom réel (~1.95)
-#             → la calibration corromprait mu et ferait exploser les z-scores
-_EVENT_BASELINE_DEFAULT   = {"mu": 0.2,  "sigma": 0.3}
-_TRAFFIC_BASELINE_DEFAULT = {"mu": 1.95, "sigma": 0.4}
+# event exclu de la calibration auto : non-stationnaire (calendrier statique,
+# peut être tout-à-zéro pendant des jours). Baseline fixe.
+_EVENT_BASELINE_DEFAULT = {"mu": 0.2, "sigma": 0.3}
 
 
 def _apply_calibration(min_count: int = 96) -> None:
     """
     Recalibre scoring.BASELINE depuis les raw_signals en base.
-    event et traffic sont exclus (voir constantes ci-dessus).
+    event est exclu (non-stationnaire). traffic, weather, transport,
+    incident sont calibrés automatiquement depuis l'historique Criter.
     Appelé au démarrage et toutes les 7 jours à 3h00.
     """
-    # Toujours réinitialiser les signaux protégés à leurs valeurs de référence
-    scoring.BASELINE["event"]   = _EVENT_BASELINE_DEFAULT.copy()
-    scoring.BASELINE["traffic"] = _TRAFFIC_BASELINE_DEFAULT.copy()
+    # Seul event reste fixe (non-stationnaire)
+    scoring.BASELINE["event"] = _EVENT_BASELINE_DEFAULT.copy()
 
     baselines = get_calibration_baselines(min_count=min_count)
     if not baselines:

@@ -214,9 +214,9 @@ def _day_type(dt: datetime) -> str:
     return "semaine"
 
 BASELINE = {
-    "traffic":   {"mu": 1.30, "sigma": 0.50},   # Criter : V=1.0 O=2.0 R=2.8 N=3.0
+    "traffic":   {"mu": 1.05, "sigma": 0.15},   # Criter : V≈1.0, O≈2.0, R≈2.8, N≈3.0 — recalibré auto
     "weather":   {"mu": 0.3,  "sigma": 0.35},
-    "event":     {"mu": 0.2,  "sigma": 0.3},
+    "event":     {"mu": 0.2,  "sigma": 0.3},     # non-stationnaire — exclu de la calibration auto
     "transport": {"mu": 0.45, "sigma": 0.35},
     "incident":  {"mu": 0.8,  "sigma": 0.6},
 }
@@ -286,7 +286,7 @@ def _ramp(x: float, x0: float, x1: float, v0: float, v1: float) -> float:
 
 def _phi_semaine(t: float) -> float:
     """Profil semaine standard (lun, mar, jeu, ven hors vacances).
-    Calibré sur données réelles Lyon (TomTom 2025, CEREMA, EMD 2015).
+    Calibré sur données réelles Lyon (Criter, CEREMA, EMD 2015).
     Congestion: nuit ~5%, off-peak ~30%, rush matin ~80%, rush soir ~90%.
     Le rush soir est plus intense que le matin à Lyon."""
     if t < 5.0:  return 0.50                               # nuit (~5%)
@@ -353,7 +353,7 @@ def _phi_vacances(t: float) -> float:
 def _phi_weekend(t: float) -> float:
     """Profil weekend et jours fériés.
     Pas de rush commuter. Pic commercial 10h-18h (shopping Part-Dieu, Confluence).
-    Congestion ~40-50% du pic semaine (TomTom). Samedi > dimanche mais profil unique."""
+    Congestion ~40-50% du pic semaine (Criter/CEREMA). Samedi > dimanche mais profil unique."""
     if t < 7.0:  return 0.45                               # nuit/grasse mat
     if t < 9.0:  return _ramp(t, 7.0,  9.0,  0.45, 0.70) # réveil lent
     if t < 10.0: return _ramp(t, 9.0,  10.0, 0.70, 0.90) # montée shopping
@@ -545,10 +545,10 @@ def compute_forecast(
             # Même signaux qu'actuellement, mais phi à l'heure future.
             # "Si rien ne change, quel est le score à 17h ?"
             #
-            # Ajustement trafic : Criter ne capture pas la congestion réelle.
-            # Le signal reste ~1.0 quelle que soit l'heure. Mais TomTom montre
-            # que la congestion monte proportionnellement au rush (80-90% vs 30%).
-            # On ajuste le trafic projeté via le ratio phi pour simuler cet effet.
+            # Ajustement trafic : si le rush approche (phi_future > phi_now),
+            # on interpole le trafic actuel vers mu (congestion moyenne).
+            # Criter capte la congestion réelle, mais la projection forward
+            # utilise le ratio phi pour anticiper l'intensification.
             maintained_signals = dict(signals)
             if phi_future > phi_now and "traffic" in maintained_signals:
                 # Le trafic brut augmente vers la baseline au rush

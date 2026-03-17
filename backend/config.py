@@ -62,7 +62,7 @@ FORECAST_HORIZONS: List[int] = [30, 60, 120]
 CACHE_TTL_SECONDS: int = 60
 ENABLE_HISTORY: bool = os.getenv("ENABLE_HISTORY", "true").lower() == "true"
 
-# Mapping état Criter → ratio freeFlow/current (échelle TomTom)
+# Mapping état Criter → ratio synthétique de congestion
 # V=fluide, O=dense, R=chargé, N=coupée, G/*/inconnu=ignoré
 CRITER_ETAT_TO_RATIO: Dict[str, float] = {
     "V": 1.0,   # vert  = fluide  — circulation normale

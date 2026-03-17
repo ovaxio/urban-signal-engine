@@ -71,20 +71,21 @@ async def fetch_weather() -> Dict[str, float]:
     score += min(precip / 5.0, 1.5)
     score += 0.5 if wind > 50 else 0.0
     score += 1.5 if wmo >= 95 else (0.8 if wmo >= 61 else 0.0)
+    score = min(score, 3.0)
     return {z: round(score, 3) for z in ZONE_CENTROIDS}
 
 # ---------------------------------------------------------------------------
 # Trafic — Grand Lyon Criter (données officielles, sans quota)
 # ---------------------------------------------------------------------------
 
-_TRAFFIC_NEUTRAL = 1.30   # baseline mu Criter — z≈0 quand données indisponibles
+_TRAFFIC_NEUTRAL = 1.0    # Criter V=fluide → z≈0 quand données indisponibles
 
 async def fetch_traffic() -> Dict[str, float]:
     """
     Récupère l'état du trafic en temps réel depuis le système Criter
     de la Métropole de Lyon (WFS Grand Lyon, sans clé API, sans quota).
-    Retourne un ratio freeFlow/current par zone, sur la même échelle
-    que l'ancien signal TomTom [0.5–3.0].
+    Retourne un ratio de congestion par zone [0.5–3.0].
+    V=1.0 (fluide), O=2.0 (dense), R=2.8 (chargé), N=3.0 (coupée).
     """
     neutral = {z: _TRAFFIC_NEUTRAL for z in ZONE_CENTROIDS}
 
@@ -314,7 +315,8 @@ async def fetch_incidents() -> tuple:
     }
 
     # Détails lisibles des événements actifs par zone
-    PARIS_OFFSET = datetime.timezone(datetime.timedelta(hours=2))
+    from zoneinfo import ZoneInfo
+    PARIS_TZ = ZoneInfo("Europe/Paris")
     events_by_zone: Dict[str, list] = {z: [] for z in ZONE_CENTROIDS}
 
     for feat in features:
@@ -354,7 +356,7 @@ async def fetch_incidents() -> tuple:
             end_dt = datetime.datetime.fromisoformat(end_s)
             if end_dt.tzinfo is None:
                 end_dt = end_dt.replace(tzinfo=datetime.timezone.utc)
-            end_fmt   = end_dt.astimezone(PARIS_OFFSET).strftime("%-d %b %H:%M")
+            end_fmt   = end_dt.astimezone(PARIS_TZ).strftime("%-d %b %H:%M")
             ends_soon = now <= end_dt <= now + datetime.timedelta(hours=2)
         except (ValueError, TypeError):
             pass

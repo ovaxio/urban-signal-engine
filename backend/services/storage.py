@@ -168,7 +168,7 @@ def _seed_signals_history(conn: sqlite3.Connection, db_path: Path = DB_PATH) -> 
                 else:
                     values.append(v)
             batch.append(tuple(values))
-            if len(batch) >= 5000:
+            if len(batch) >= 2000:  # SQLite max params = 32767 / 13 cols ≈ 2520
                 conn.executemany(sql, batch)
                 inserted += len(batch)
                 batch.clear()
@@ -368,11 +368,8 @@ def get_calibration_baselines(
     }
 
     baselines = {}
-    # Signaux exclus de la calibration automatique :
-    # - event : non-stationnaire (calendrier statique, peut être tout-à-zéro)
-    # - traffic : le seed génère des ratios ~1.0 (flux libre) ≠ TomTom réel (~1.95)
-    #   → la calibration corrompt mu et fait exploser les z-scores (+5σ pour trafic normal)
-    for signal in ("weather", "transport", "incident"):
+    # event exclu : non-stationnaire (calendrier statique, peut être tout-à-zéro)
+    for signal in ("traffic", "weather", "transport", "incident"):
         col = f"raw_{signal}"
         sql = f"""
             SELECT
@@ -407,9 +404,8 @@ def get_calibration_baselines_per_zone(
     Les zones avec moins de min_count relevés sont ignorées (baseline globale utilisée).
     Le signal event est exclu (historique non-stationnaire).
     """
-    # traffic exclu : le seed génère des ratios ~1.0 ≠ TomTom réel (~1.95)
-    # → calibration par zone corromprait mu et ferait exploser les z-scores
     MIN_SIGMA = {
+        "traffic":   0.15,
         "weather":   0.10,
         "transport": 0.10,
         "incident":  0.15,
@@ -419,6 +415,8 @@ def get_calibration_baselines_per_zone(
         SELECT
             zone_id,
             COUNT(raw_traffic)                                                AS n,
+            AVG(raw_traffic)                                                  AS mu_traffic,
+            AVG(raw_traffic*raw_traffic) - AVG(raw_traffic)*AVG(raw_traffic)  AS var_traffic,
             AVG(raw_weather)                                                  AS mu_weather,
             AVG(raw_weather*raw_weather) - AVG(raw_weather)*AVG(raw_weather)  AS var_weather,
             AVG(raw_transport)                                                AS mu_transport,
@@ -440,7 +438,7 @@ def get_calibration_baselines_per_zone(
             continue
         zone_id = row["zone_id"]
         zone_bl: Dict[str, Dict[str, float]] = {}
-        for signal in ("weather", "transport", "incident"):
+        for signal in ("traffic", "weather", "transport", "incident"):
             mu  = row[f"mu_{signal}"]
             var = row[f"var_{signal}"] or 0.0
             if mu is None:
