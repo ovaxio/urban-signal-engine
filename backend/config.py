@@ -47,6 +47,15 @@ BETA: Dict[str, float] = {
     "transport_incident": 0.4,
 }
 
+# Borne max de Σβ_k — validation au démarrage, ValueError si dépassée.
+# Σβ_k actuel = 3.20. Valeur par défaut à 3.5 pour garder une marge.
+# Réduire B si on réduit les β, ou augmenter si on ajoute des paires.
+CONV_BETA_SUM_MAX: float = 3.5
+
+# Seuil max acceptable pour sigmoid(0 − θ) à z=0 (régime neutre).
+# Si dépassé : warning au boot (conv a un fond résiduel non négligeable).
+CONV_THETA_EPSILON: float = 0.05
+
 SPATIAL_KERNEL_DECAY: float = 0.6
 FORECAST_HORIZONS: List[int] = [30, 60, 120]
 # Criter : 2 appels/refresh (trafic + incidents), sans quota → TTL 60s

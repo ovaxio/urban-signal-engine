@@ -33,8 +33,10 @@ from services.scoring import (
     _is_vacances,
     _is_ferie,
     _day_type,
+    _soft_gate,
+    _validate_config,
 )
-from config import LAMBDA, WEIGHTS, ALPHA, THETA
+from config import LAMBDA, WEIGHTS, ALPHA, THETA, BETA, CONV_BETA_SUM_MAX, CONV_THETA_EPSILON
 
 
 # ─── Fixtures ──────────────────────────────────────────────────────────────────
@@ -726,3 +728,129 @@ class TestForecast3Scenarios:
             assert f["urban_score"] >= 20, (
                 f"Score forecast trop bas: {f['urban_score']} à +{f['horizon_min']}min"
             )
+
+
+# ─── A. interp — tests par valeur de phi_ratio ──────────────────────────────
+
+class TestInterpFormula:
+    """Tests directs de la formule interp = min(max((phi_r - 1.0) * 0.6, 0.0), 0.5)."""
+
+    @staticmethod
+    def _interp(phi_ratio: float) -> float:
+        return min(max((phi_ratio - 1.0) * 0.6, 0.0), 0.5)
+
+    def test_phi_ratio_below_one(self):
+        assert self._interp(0.8) == 0.0
+
+    def test_phi_ratio_exactly_one(self):
+        assert self._interp(1.0) == 0.0
+
+    def test_phi_ratio_moderate(self):
+        assert self._interp(1.2) == pytest.approx(0.12)
+
+    def test_phi_ratio_high(self):
+        """phi_ratio très élevé → interp plafonné à 0.5."""
+        assert self._interp(5.0) == pytest.approx(0.5)
+        assert self._interp(100.0) == pytest.approx(0.5)
+
+    def test_interp_always_in_range(self):
+        """Monte Carlo : interp ∈ [0, 0.5] pour tout phi_ratio ∈ [0.1, 10]."""
+        import random
+        random.seed(99)
+        for _ in range(5000):
+            phi_r = random.uniform(0.1, 10.0)
+            i = self._interp(phi_r)
+            assert 0.0 <= i <= 0.5, f"interp={i} pour phi_ratio={phi_r}"
+
+
+# ─── B. validation Σβ_k au démarrage ────────────────────────────────────────
+
+class TestConfigValidation:
+    def test_validate_config_passes(self):
+        """La config actuelle doit passer la validation sans erreur."""
+        _validate_config()  # ne doit pas lever
+
+    def test_beta_sum_within_bound(self):
+        """Σβ_k doit être ≤ CONV_BETA_SUM_MAX."""
+        beta_sum = sum(BETA.values())
+        assert beta_sum <= CONV_BETA_SUM_MAX, (
+            f"Σβ_k = {beta_sum:.2f} > CONV_BETA_SUM_MAX = {CONV_BETA_SUM_MAX}"
+        )
+
+    def test_beta_sum_exceeds_bound_raises(self):
+        """Si Σβ_k dépasse la borne, ValueError au démarrage."""
+        import config
+        original = config.CONV_BETA_SUM_MAX
+        try:
+            config.CONV_BETA_SUM_MAX = 0.1  # borne absurdement basse
+            with pytest.raises(ValueError, match="Σβ_k"):
+                _validate_config()
+        finally:
+            config.CONV_BETA_SUM_MAX = original
+
+    def test_weights_sum_to_one(self):
+        assert sum(WEIGHTS.values()) == pytest.approx(1.0)
+
+
+# ─── C. fond résiduel conv au régime neutre ──────────────────────────────────
+
+class TestConvNeutralRegime:
+    def test_soft_gate_at_zero_below_epsilon(self):
+        """sigmoid(0 − θ) < ε pour chaque θ — pas de fond résiduel."""
+        for signal, theta in THETA.items():
+            gate = _soft_gate(0.0, theta)
+            assert gate < CONV_THETA_EPSILON, (
+                f"sigmoid(0 − θ[{signal}]) = {gate:.4f} ≥ ε = {CONV_THETA_EPSILON}"
+            )
+
+    def test_conv_near_zero_at_neutral(self):
+        """Quand tous z_s = 0 (signaux au baseline), conv < 0.01."""
+        neutral = {s: BASELINE[s]["mu"] for s in BASELINE}
+        c = compute_conv(neutral)
+        assert c < 0.01, f"conv au régime neutre = {c:.4f} — fond résiduel trop élevé"
+
+    def test_conv_near_zero_with_signals_below_theta(self):
+        """Signaux modérément au-dessus du baseline mais sous θ → conv négligeable."""
+        mild = {
+            "traffic":   BASELINE["traffic"]["mu"] + 0.3 * BASELINE["traffic"]["sigma"],
+            "weather":   BASELINE["weather"]["mu"] + 0.3 * BASELINE["weather"]["sigma"],
+            "event":     BASELINE["event"]["mu"] + 0.3 * BASELINE["event"]["sigma"],
+            "transport": BASELINE["transport"]["mu"] + 0.3 * BASELINE["transport"]["sigma"],
+            "incident":  BASELINE["incident"]["mu"] + 0.3 * BASELINE["incident"]["sigma"],
+        }
+        c = compute_conv(mild)
+        assert c < 0.05, f"conv avec signaux doux = {c:.4f} — attendu < 0.05"
+
+
+# ─── D. sémantique du score neutre ──────────────────────────────────────────
+
+class TestScoreNeutralSemantics:
+    def test_score_at_raw_zero_is_calme(self):
+        """raw=0 (alert=0, spread=0) → score ≈ 29, catégorie CALME."""
+        score = compute_urban_score(0.0, 0.0)
+        assert 27 <= score <= 31, f"score neutre = {score}, attendu ≈ 29"
+        assert score_level(score) == "CALME"
+
+    def test_score_50_at_raw_1_5(self):
+        """raw=1.5 → score = 50 (point d'inflexion de la sigmoid)."""
+        # alert=1.5, spread=0 → raw=1.5
+        score = compute_urban_score(1.5, 0.0)
+        assert score == 50
+
+    def test_score_critique_threshold(self):
+        """raw ≈ 3.0 → score ≈ 71–72 (seuil CRITIQUE)."""
+        score = compute_urban_score(3.0, 0.0)
+        assert 70 <= score <= 73, f"score critique = {score}"
+        # Juste au-dessus du seuil TENDU/CRITIQUE
+        assert score_level(score) in ("TENDU", "CRITIQUE")
+
+    def test_all_baseline_signals_give_calme(self):
+        """Quand tous les signaux sont exactement au baseline → CALME."""
+        neutral = {s: BASELINE[s]["mu"] for s in BASELINE}
+        phi = compute_phi(DT_NOON)
+        risk = compute_risk(neutral, phi)
+        anom = compute_anomaly(neutral)
+        conv = compute_conv(neutral)
+        alert = compute_alert(risk, anom, conv)
+        score = compute_urban_score(alert, 0.0)
+        assert score_level(score) == "CALME", f"signaux baseline → score {score} ({score_level(score)})"

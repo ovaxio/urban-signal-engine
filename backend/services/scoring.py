@@ -66,7 +66,48 @@ from zoneinfo import ZoneInfo
 
 LYON_TZ = ZoneInfo("Europe/Paris")
 
-from config import EPSILON, WEIGHTS, LAMBDA, THETA, ALPHA, BETA, SPATIAL_KERNEL_DECAY, FORECAST_HORIZONS
+from config import (
+    EPSILON, WEIGHTS, LAMBDA, THETA, ALPHA, BETA,
+    SPATIAL_KERNEL_DECAY, FORECAST_HORIZONS,
+)
+
+import logging as _logging
+_log = _logging.getLogger("scoring")
+
+
+# ─── Validations au démarrage (fail-fast) ────────────────────────────────────
+
+def _validate_config() -> None:
+    """Vérifie la cohérence des hyperparamètres au chargement du module.
+    Appelé une seule fois à l'import — erreur bloquante = startup interrompu."""
+    import config as _cfg  # relecture dynamique pour testabilité
+
+    # B.1 — Σβ_k ≤ CONV_BETA_SUM_MAX
+    beta_sum = sum(BETA.values())
+    if beta_sum > _cfg.CONV_BETA_SUM_MAX:
+        raise ValueError(
+            f"Σβ_k = {beta_sum:.2f} dépasse la borne CONV_BETA_SUM_MAX = {_cfg.CONV_BETA_SUM_MAX}. "
+            f"Ajuster les BETA dans config.py ou augmenter CONV_BETA_SUM_MAX."
+        )
+
+    # C — Vérifier que sigmoid(0 − θ) < ε pour chaque θ (fond résiduel conv)
+    # soft_gate(0, θ, k=4) = 1 / (1 + exp(k·θ))
+    for signal, theta in THETA.items():
+        gate_at_zero = 1.0 / (1.0 + math.exp(4.0 * theta))
+        if gate_at_zero >= _cfg.CONV_THETA_EPSILON:
+            _log.warning(
+                "θ[%s] = %.2f trop bas : sigmoid(0 − θ) = %.4f ≥ ε = %.2f. "
+                "Conv aura un fond résiduel non négligeable au régime neutre.",
+                signal, theta, gate_at_zero, _cfg.CONV_THETA_EPSILON,
+            )
+
+    # Σw_s = 1.0
+    w_sum = sum(WEIGHTS.values())
+    if abs(w_sum - 1.0) > 0.01:
+        _log.warning("Σ WEIGHTS = %.3f ≠ 1.0 — risk ne sera pas normalisé.", w_sum)
+
+
+_validate_config()
 
 
 # ─── Calendrier scolaire & jours fériés ───────────────────────────────────
@@ -397,9 +438,16 @@ def compute_spread(zone_id: str, alert_map: dict) -> float:
 
 def compute_urban_score(alert: float, spread: float) -> int:
     raw = alert + LAMBDA["l4"] * spread
-    # Sigmoid mapping — préserve les seuils existants (CALME/MODÉRÉ/TENDU/CRITIQUE)
-    # tout en étirant la plage haute pour mieux différencier TENDU et CRITIQUE.
-    # Centre=1.5, k=0.6 → baseline(raw=0)≈29, TENDU à raw≈1.85, CRITIQUE à raw≈3.04
+    # ── Sémantique du score neutre ──────────────────────────────────────
+    # Sigmoid centrée à raw=1.5, PAS à 0. Conséquences :
+    #   raw = 0.0 → score ≈ 29  (CALME — tous signaux au baseline)
+    #   raw = 1.5 → score = 50  (tension médiane du modèle)
+    #   raw = 3.0 → score ≈ 71  (seuil CRITIQUE)
+    #
+    # Score 50 ≠ "absence de tension". C'est le point d'inflexion où la
+    # tension passe de modérée à significative. Le vrai neutre est ~29.
+    # Ce choix est intentionnel : il compresse la plage basse (CALME) et
+    # étire la plage haute pour mieux différencier TENDU et CRITIQUE.
     normalized = 1.0 / (1.0 + math.exp(-0.6 * (raw - 1.5)))
     return int(max(0, min(100, normalized * 100)))
 
