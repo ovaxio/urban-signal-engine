@@ -131,19 +131,41 @@ async def _backup_loop():
             log.error(f"Backup error: {e}")
 
 
+async def _calendar_loop():
+    """Refresh vacances scolaires tous les 90 jours."""
+    from services.calendar import refresh_vacances
+    INTERVAL = 90 * 24 * 3600  # 90 jours
+    try:
+        count = await refresh_vacances()
+        log.info(f"Calendrier scolaire initialisé : {count} périodes")
+    except Exception as e:
+        log.warning(f"Calendrier scolaire init fallback : {e}")
+    while True:
+        await asyncio.sleep(INTERVAL)
+        try:
+            count = await refresh_vacances()
+            log.info(f"Calendrier scolaire refreshed : {count} périodes")
+        except Exception as e:
+            log.error(f"Calendar refresh error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("Urban Signal Engine — starting")
     init_db()
     init_auth_db()
     _apply_calibration()
-    task_refresh = asyncio.create_task(_refresh_loop())
-    task_calib   = asyncio.create_task(_calibration_loop())
-    task_backup  = asyncio.create_task(_backup_loop())
+    # Charger le calendrier scolaire depuis la DB (fallback hardcodé si vide)
+    scoring.load_vacances_from_db()
+    task_refresh  = asyncio.create_task(_refresh_loop())
+    task_calib    = asyncio.create_task(_calibration_loop())
+    task_backup   = asyncio.create_task(_backup_loop())
+    task_calendar = asyncio.create_task(_calendar_loop())
     yield
     task_refresh.cancel()
     task_calib.cancel()
     task_backup.cancel()
+    task_calendar.cancel()
 
 
 app = FastAPI(

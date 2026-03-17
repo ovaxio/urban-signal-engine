@@ -46,6 +46,17 @@ CREATE TABLE IF NOT EXISTS alerts_log (
 );
 """
 
+CREATE_VACANCES = """
+CREATE TABLE IF NOT EXISTS calendar_vacances (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    start_date  TEXT NOT NULL,
+    end_date    TEXT NOT NULL,
+    description TEXT,
+    zone        TEXT DEFAULT 'A',
+    fetched_at  TEXT NOT NULL
+);
+"""
+
 CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_sh_zone_ts  ON signals_history (zone_id, ts);",
     "CREATE INDEX IF NOT EXISTS idx_sh_ts       ON signals_history (ts);",
@@ -74,6 +85,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
     with _get_conn(db_path) as conn:
         conn.execute(CREATE_SIGNALS_HISTORY)
         conn.execute(CREATE_ALERTS_LOG)
+        conn.execute(CREATE_VACANCES)
         for idx_sql in CREATE_INDEXES:
             conn.execute(idx_sql)
         _migrate_raw_columns(conn)
@@ -92,6 +104,35 @@ def _migrate_raw_columns(conn: sqlite3.Connection) -> None:
                 logger.info("Migration : colonne '%s' ajoutée.", col)
             except sqlite3.OperationalError as e:
                 logger.warning("Migration skip '%s' : %s", col, e)
+
+
+# ─── Calendrier scolaire ──────────────────────────────────────────────────────
+
+def get_vacances(db_path: Path = DB_PATH) -> List[Dict[str, Any]]:
+    """Retourne les vacances scolaires depuis la DB."""
+    with _get_conn(db_path) as conn:
+        rows = conn.execute(
+            "SELECT start_date, end_date, description FROM calendar_vacances WHERE zone = 'A' ORDER BY start_date"
+        ).fetchall()
+    from datetime import date as _date
+    return [
+        {"start": _date.fromisoformat(r[0]), "end": _date.fromisoformat(r[1]), "description": r[2]}
+        for r in rows
+    ]
+
+
+def save_vacances(periods: List[Dict[str, Any]], db_path: Path = DB_PATH) -> int:
+    """Remplace les vacances en DB par les nouvelles périodes."""
+    now = datetime.now(timezone.utc).isoformat()
+    with _get_conn(db_path) as conn:
+        conn.execute("DELETE FROM calendar_vacances WHERE zone = 'A'")
+        for p in periods:
+            conn.execute(
+                "INSERT INTO calendar_vacances (start_date, end_date, description, zone, fetched_at) VALUES (?, ?, ?, 'A', ?)",
+                (str(p["start"]), str(p["end"]), p.get("description", ""), now),
+            )
+    logger.info("Vacances scolaires sauvegardées : %d périodes", len(periods))
+    return len(periods)
 
 
 # ─── Persistence ───────────────────────────────────────────────────────────────
