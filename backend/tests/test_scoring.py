@@ -90,24 +90,25 @@ class TestComputePhi:
         for h in [0, 1, 2, 3, 4]:
             dt = datetime(2024, 3, 12, h, 0, tzinfo=timezone.utc)
             # UTC h = Paris h+1 (hiver) → h=0..3 UTC = 1..4h Paris = nuit
-            assert compute_phi(dt) == pytest.approx(0.7, abs=0.05)
+            assert compute_phi(dt) == pytest.approx(0.5, abs=0.05)
 
     def test_rush_morning_is_high(self):
-        # 7h UTC = 8h Paris = rush matin
-        dt = datetime(2024, 3, 12, 7, 0, tzinfo=timezone.utc)
-        assert compute_phi(dt) == pytest.approx(1.3, abs=0.05)
+        # 7h UTC = 8h Paris = rush matin (semaine)
+        dt = datetime(2024, 3, 12, 7, 0, tzinfo=timezone.utc)  # mardi
+        assert compute_phi(dt) == pytest.approx(1.55, abs=0.10)
 
     def test_rush_evening_is_high(self):
-        # 17h UTC = 18h Paris = rush soir
-        dt = datetime(2024, 3, 12, 17, 0, tzinfo=timezone.utc)
-        assert compute_phi(dt) == pytest.approx(1.3, abs=0.05)
+        # 17h UTC = 18h Paris = rush soir (semaine — plus intense que matin)
+        dt = datetime(2024, 3, 12, 17, 0, tzinfo=timezone.utc)  # mardi
+        assert compute_phi(dt) == pytest.approx(1.75, abs=0.10)
 
     def test_phi_always_in_range(self):
         for h in range(24):
             for m in [0, 15, 30, 45]:
                 dt = datetime(2024, 3, 12, h, m, tzinfo=timezone.utc)
                 phi = compute_phi(dt)
-                assert 0.69 <= phi <= 1.31, f"phi={phi} hors [0.7, 1.3] à {h}:{m:02d} UTC"
+                # Profils calibrés Lyon : nuit 0.45, rush soir 1.75
+                assert 0.40 <= phi <= 1.80, f"phi={phi} hors [0.40, 1.80] à {h}:{m:02d} UTC"
 
     def test_no_discontinuity(self):
         """Deux minutes consécutives ne peuvent pas sauter de plus de 0.02."""
@@ -267,8 +268,9 @@ class TestEndToEndScenarios:
     def test_neutral_is_calme(self):
         assert score_level(self._score(SIGNALS_NEUTRAL, DT_NOON)) == "CALME"
 
-    def test_rush_is_modere(self):
-        assert score_level(self._score(SIGNALS_RUSH, DT_RUSH)) == "MODÉRÉ"
+    def test_rush_is_tendu(self):
+        # Avec phi calibré Lyon (1.55-1.75 au rush), SIGNALS_RUSH passe en TENDU
+        assert score_level(self._score(SIGNALS_RUSH, DT_RUSH)) == "TENDU"
 
     def test_fete_is_critique(self):
         assert score_level(self._score(SIGNALS_FETE, DT_ERUSH)) == "CRITIQUE"

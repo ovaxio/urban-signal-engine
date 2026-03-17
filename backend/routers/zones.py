@@ -136,6 +136,7 @@ async def get_zone_forecast(zone_id: str, force_refresh: bool = Query(False)):
         signals=z.get("raw_signals"),
         incident_schedule=_cache["incident_schedule"].get(zone_id),
         bl=_effective_baseline(zone_id),
+        zone_id=zone_id,
     )
     return {
         "zone_id":       zone_id,

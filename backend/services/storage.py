@@ -410,6 +410,75 @@ def get_history_range(
     return [dict(r) for r in rows]
 
 
+def get_hourly_signal_profiles(
+    zone_id: str,
+    day_type: str = None,
+    min_count: int = 3,
+    db_path: Path = DB_PATH,
+) -> Dict[int, Dict[str, float]]:
+    """
+    Calcule la moyenne des signaux bruts par heure pour une zone.
+    Retourne un dict heure (0-23) → {traffic, weather, event, transport, incident}.
+    Si day_type est fourni (semaine/mercredi/vacances/weekend), filtre par jour.
+    Les heures avec moins de min_count relevés sont exclues.
+    """
+    # On extrait l'heure depuis le timestamp ISO
+    # day_of_week: 0=dimanche en SQLite strftime('%w'), on convertit en Python (0=lundi)
+    signals = ("traffic", "weather", "event", "transport", "incident")
+    cols_avg = ", ".join(f"AVG(raw_{s}) AS avg_{s}" for s in signals)
+    cols_count = "COUNT(raw_traffic) AS n"
+
+    where_clauses = ["zone_id = ?", "raw_traffic IS NOT NULL"]
+    params: list = [zone_id]
+
+    # Filtrage par day_type via le jour de semaine SQLite
+    if day_type == "weekend":
+        # SQLite %w: 0=dimanche, 6=samedi
+        where_clauses.append("CAST(strftime('%w', ts) AS INTEGER) IN (0, 6)")
+    elif day_type == "mercredi":
+        where_clauses.append("CAST(strftime('%w', ts) AS INTEGER) = 3")
+    elif day_type in ("semaine", "vacances"):
+        # Jours de semaine (lun-ven sauf mercredi) — vacances vs semaine
+        # ne peut pas être distingué par SQL seul, on filtre semaine complète
+        where_clauses.append("CAST(strftime('%w', ts) AS INTEGER) IN (1, 2, 4, 5)")
+
+    where = " AND ".join(where_clauses)
+
+    sql = f"""
+        SELECT
+            CAST(strftime('%H', ts) AS INTEGER) AS hour,
+            {cols_count},
+            {cols_avg}
+        FROM signals_history
+        WHERE {where}
+        GROUP BY hour
+        ORDER BY hour
+    """
+
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, params).fetchall()
+
+    result: Dict[int, Dict[str, float]] = {}
+    for row in rows:
+        if row["n"] < min_count:
+            continue
+        h = row["hour"]
+        profile: Dict[str, float] = {}
+        for s in signals:
+            val = row[f"avg_{s}"]
+            if val is not None:
+                profile[s] = round(val, 4)
+        if profile:
+            result[h] = profile
+
+    logger.debug(
+        "Profils horaires %s (day_type=%s) : %d heures couvertes",
+        zone_id, day_type, len(result),
+    )
+    return result
+
+
 def get_alerts_range(
     start: str,
     end: str,

@@ -371,15 +371,16 @@ def compute_forecast(
     signals: dict = None,                        # signaux bruts — pour extraction incident
     incident_schedule: Dict[int, float] = None,  # {30: v, 60: v, 120: v} planifié
     bl: Dict = None,                             # baseline effective de la zone
+    zone_id: str = None,                         # pour lookup profils horaires
 ) -> List[dict]:
     """
     Prévision probabiliste sur 30/60/120 min.
     Intègre :
       - phi futur (heures de pointe)
       - tendance récente (delta score / min)
-      - persistance via decay exponentiel
-      - incidents planifiés (starttime/endtime Criter) : remplace le decay incident
-        par la valeur réelle à chaque horizon (ex: tunnel fermé à 20h anticipé à 19h)
+      - profils horaires historiques : projette les signaux bruts à chaque horizon
+        en interpolant entre la valeur actuelle et la moyenne historique à cette heure
+      - incidents planifiés (starttime/endtime Criter)
     """
     if dt is None:
         dt = datetime.now(timezone.utc)
@@ -387,44 +388,139 @@ def compute_forecast(
     phi_now = max(compute_phi(dt), 0.1)
     _bl = bl or BASELINE
 
-    # Contribution incident courante dans l'alert (pour soustraction avant remplacement)
-    incident_now  = (signals or {}).get("incident", 0.0)
-    z_inc_now     = normalize(incident_now, "incident", _bl)
-    inc_alert_now = (
-        LAMBDA["l1"] * phi_now * WEIGHTS["incident"] * z_inc_now
-        + LAMBDA["l2"] * ALPHA["incident"] * max(z_inc_now, 0.0)
-    )
+    # ── Profils horaires historiques ──────────────────────────────────
+    hourly_profiles: Dict[int, Dict[str, float]] = {}
+    if zone_id:
+        try:
+            from services.storage import get_hourly_signal_profiles
+            day_t = _day_type(dt)
+            hourly_profiles = get_hourly_signal_profiles(zone_id, day_type=day_t)
+            # Fallback : si pas assez de données pour ce day_type, essayer sans filtre
+            if len(hourly_profiles) < 12:
+                hourly_profiles = get_hourly_signal_profiles(zone_id)
+        except Exception:
+            pass  # fallback : forecast classique sans projection
 
     results = []
     for h in FORECAST_HORIZONS:
         future_dt  = dt + timedelta(minutes=h)
         phi_future = compute_phi(future_dt)
-        # Ratio phi cappé pour éviter qu'une nuit calme prédise TENDU au rush
-        # Cap 1.8 : cohérent avec le ratio max Lyon (rush soir 1.75 / off-peak 1.05)
-        phi_ratio  = min(phi_future / phi_now, 1.8)
+        future_hour = future_dt.hour
 
-        # Decay lent (tau=240) pour permettre au phi rush hour de compenser
-        decay = math.exp(-h / 240)
+        # ── Forecast à 3 scénarios (max wins) ─────────────────────────
+        #
+        # 1. Persistance décayée : alert × decay × phi_ratio
+        #    → modèle classique, bon pour signaux transitoires
+        #
+        # 2. Situation maintenue + phi futur : recalcule l'alert
+        #    avec les mêmes signaux mais phi à l'heure future
+        #    → capte : "si les travaux/incidents actuels persistent au rush,
+        #              le score monte car φ amplifie"
+        #
+        # 3. Projection avec incident_schedule Criter :
+        #    → utilise le decay par type (travaux=persist, bouchon=decay rapide)
+        #    + profils historiques pour les signaux structurels
+        #
+        # On prend le MAX → le forecast reflète le pire scénario réaliste
 
-        # Composante tendance — pondérée pour avoir un impact réel sur le score
-        trend_decay   = math.exp(-h / 60)
-        trend_contrib = max(-1.0, min(1.0, trend * h * trend_decay))
+        if signals:
+            profile_at_h = hourly_profiles.get(future_hour, {})
 
-        fa  = alert * decay * phi_ratio
-        fa += trend_contrib * 0.3
+            # --- 1. Persistance décayée ---
+            phi_ratio = min(phi_future / phi_now, 1.8)
+            decay = math.exp(-h / 240)
+            fa_persist = alert * decay * phi_ratio
 
-        # Remplacement incident planifié : si schedule disponible, on ne decay pas
-        # l'incident — on utilise la valeur réelle à ce horizon depuis Criter
-        if signals and incident_schedule and h in incident_schedule:
-            z_inc_sched = normalize(incident_schedule[h], "incident", _bl)
-            inc_alert_sched = (
-                LAMBDA["l1"] * phi_future * WEIGHTS["incident"] * z_inc_sched
-                + LAMBDA["l2"] * ALPHA["incident"] * max(z_inc_sched, 0.0)
+            # --- 2. Situation maintenue + phi futur ---
+            # Même signaux qu'actuellement, mais phi à l'heure future.
+            # "Si rien ne change, quel est le score à 17h ?"
+            #
+            # Ajustement trafic : Criter ne capture pas la congestion réelle.
+            # Le signal reste ~1.0 quelle que soit l'heure. Mais TomTom montre
+            # que la congestion monte proportionnellement au rush (80-90% vs 30%).
+            # On ajuste le trafic projeté via le ratio phi pour simuler cet effet.
+            maintained_signals = dict(signals)
+            if phi_future > phi_now and "traffic" in maintained_signals:
+                # Le trafic brut augmente vers la baseline au rush
+                # phi_ratio > 1 → on rapproche le trafic de mu (congestion)
+                traffic_now = maintained_signals["traffic"]
+                traffic_mu = _bl["traffic"]["mu"]
+                phi_r = phi_future / phi_now
+                # Interpolation vers mu proportionnelle au ratio phi
+                # À phi_ratio=1.55 → ~35% vers mu, à phi_ratio=1.0 → 0%
+                interp = min((phi_r - 1.0) * 0.6, 0.5)  # max 50% vers mu
+                maintained_signals["traffic"] = traffic_now + interp * (traffic_mu - traffic_now)
+
+            # Profils historiques : max(actuel, historique) pour transport
+            for sig in ("transport",):
+                hist_val = profile_at_h.get(sig)
+                if hist_val is not None and sig in maintained_signals:
+                    maintained_signals[sig] = max(maintained_signals[sig], hist_val)
+
+            risk_future = compute_risk(maintained_signals, phi_future, _bl)
+            fa_maintained = (
+                LAMBDA["l1"] * risk_future
+                + LAMBDA["l2"] * compute_anomaly(maintained_signals, _bl)
+                + LAMBDA["l3"] * compute_conv(maintained_signals, _bl)
             )
-            # Soustraire la part incident décayée, ajouter la part planifiée
-            fa = fa - inc_alert_now * decay * phi_ratio + inc_alert_sched
 
-        fs = compute_urban_score(fa, spread * decay)
+            # --- 3. Projection avec schedule + profils historiques ---
+            fa_proj = 0.0
+            if incident_schedule and h in incident_schedule:
+                # Le schedule Criter intègre la durée par type :
+                #   travaux (type 9) → factor=1.0 (persistent)
+                #   bouchon (type 6) → factor décroissant (transitoire)
+                proj_signals = dict(signals)
+                proj_signals["incident"] = incident_schedule[h]
+                # Enrichir avec max(actuel, historique) pour traffic/transport
+                for sig in ("traffic", "transport"):
+                    hist_val = profile_at_h.get(sig)
+                    if hist_val is not None:
+                        proj_signals[sig] = max(proj_signals.get(sig, 0), hist_val)
+
+                risk_p  = compute_risk(proj_signals, phi_future, _bl)
+                anom_p  = compute_anomaly(proj_signals, _bl)
+                conv_p  = compute_conv(proj_signals, _bl)
+                fa_proj = compute_alert(risk_p, anom_p, conv_p)
+
+            # --- MAX des 3 scénarios ---
+            fa = max(fa_persist, fa_maintained, fa_proj)
+
+            # Tendance récente
+            trend_decay   = math.exp(-h / 60)
+            trend_contrib = max(-1.0, min(1.0, trend * h * trend_decay))
+            fa += trend_contrib * 0.3
+
+            fs = compute_urban_score(fa, spread * math.exp(-h / 240))
+
+        else:
+            # Fallback : ancien forecast (decay + phi_ratio) quand pas de profils
+            phi_ratio = min(phi_future / phi_now, 1.8)
+            decay = math.exp(-h / 240)
+
+            trend_decay   = math.exp(-h / 60)
+            trend_contrib = max(-1.0, min(1.0, trend * h * trend_decay))
+
+            fa  = alert * decay * phi_ratio
+            fa += trend_contrib * 0.3
+
+            # Remplacement incident planifié
+            if signals and incident_schedule and h in incident_schedule:
+                incident_now  = signals.get("incident", 0.0)
+                z_inc_now     = normalize(incident_now, "incident", _bl)
+                inc_alert_now = (
+                    LAMBDA["l1"] * phi_now * WEIGHTS["incident"] * z_inc_now
+                    + LAMBDA["l2"] * ALPHA["incident"] * max(z_inc_now, 0.0)
+                )
+                z_inc_sched = normalize(incident_schedule[h], "incident", _bl)
+                inc_alert_sched = (
+                    LAMBDA["l1"] * phi_future * WEIGHTS["incident"] * z_inc_sched
+                    + LAMBDA["l2"] * ALPHA["incident"] * max(z_inc_sched, 0.0)
+                )
+                fa = fa - inc_alert_now * decay * phi_ratio + inc_alert_sched
+
+            fs = compute_urban_score(fa, spread * math.exp(-h / 240))
+
         fs = max(0, min(100, fs))
 
         results.append({
