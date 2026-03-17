@@ -542,24 +542,52 @@ PARC_ZONE: Dict[str, str] = {
     "DECC": "villette",
 }
 
+# Mapping arrêt TCL → zone, généré depuis les APIs tclarret + tclpassagearret
+# en croisant les arrêts actifs avec les centroïdes de zone (rayon ≤ 2km).
 ARRET_ZONE: Dict[int, str] = {
-    35834: "part-dieu",
-    50041: "brotteaux",   50042: "brotteaux",   50043: "brotteaux",
-    50001: "presquile",   50002: "presquile",
-    50021: "presquile",   50022: "presquile",   50023: "presquile",
-    50024: "presquile",   50025: "presquile",
-    50211: "presquile",   50212: "presquile",
-    50461: "presquile",   50462: "presquile",   50463: "presquile",
-    50851: "perrache",    50852: "perrache",
-    50441: "guillotiere", 50921: "guillotiere", 50922: "guillotiere",
-    52001: "gerland",     52002: "gerland",     52201: "gerland",
-    50951: "vieux-lyon",  50952: "vieux-lyon",  50953: "vieux-lyon",
-    52241: "fourviere",   50931: "fourviere",
-    51601: "confluence",  51602: "confluence",
-    52233: "croix-rousse", 52234: "croix-rousse", 52221: "croix-rousse",
-    51031: "villette",    51032: "villette",
-    1511:  "villette",    51011: "villette",    51012: "villette",
-    3434:  "villette",    50401: "villette",
+    # brotteaux (3 arrêts, ex: Collège B. Tavernier, Cité Inter)
+    547: "brotteaux", 817: "brotteaux", 35775: "brotteaux",
+    # confluence (2 arrêts, ex: Hôtel Région Montrochet)
+    34874: "confluence", 46179: "confluence",
+    # croix-rousse (10 arrêts, ex: Hénon, Croix-Rousse, Hôtel de Ville)
+    1153: "croix-rousse", 2369: "croix-rousse", 3503: "croix-rousse",
+    11058: "croix-rousse", 11544: "croix-rousse", 30156: "croix-rousse",
+    30159: "croix-rousse", 33645: "croix-rousse", 42214: "croix-rousse",
+    47904: "croix-rousse",
+    # fourviere (15 arrêts, ex: Gorge de Loup, Vaise, Saint-Just)
+    1061: "fourviere", 2537: "fourviere", 2828: "fourviere",
+    3434: "fourviere", 12045: "fourviere", 12273: "fourviere",
+    21420: "fourviere", 26070: "fourviere", 30210: "fourviere",
+    30214: "fourviere", 30506: "fourviere", 30575: "fourviere",
+    32682: "fourviere", 46264: "fourviere", 46710: "fourviere",
+    # gerland (4 arrêts, ex: Debourg)
+    46160: "gerland", 46190: "gerland", 46310: "gerland", 47287: "gerland",
+    # guillotiere (4 arrêts, ex: Jean Macé, Saxe-Gambetta)
+    1248: "guillotiere", 1252: "guillotiere", 32482: "guillotiere",
+    50403: "guillotiere",
+    # montchat (2 arrêts, ex: Villeurbanne Centre, Manufacture Montluc)
+    43062: "montchat", 47084: "montchat",
+    # part-dieu (11 arrêts, ex: Part-Dieu, Charpennes)
+    2213: "part-dieu", 11810: "part-dieu", 30472: "part-dieu",
+    34350: "part-dieu", 35834: "part-dieu", 41194: "part-dieu",
+    44038: "part-dieu", 45848: "part-dieu", 46642: "part-dieu",
+    46644: "part-dieu", 50140: "part-dieu",
+    # perrache (7 arrêts, ex: Perrache, Claudius Collonge)
+    542: "perrache", 23467: "perrache", 30459: "perrache",
+    33779: "perrache", 33782: "perrache", 50420: "perrache",
+    50421: "perrache",
+    # presquile (9 arrêts, ex: Cordeliers, Pont Guillotière)
+    599: "presquile", 17393: "presquile", 30041: "presquile",
+    43226: "presquile", 48351: "presquile", 48375: "presquile",
+    48376: "presquile", 50208: "presquile", 50210: "presquile",
+    # vieux-lyon (4 arrêts, ex: Gare Saint-Paul, Vieux Lyon)
+    30000: "vieux-lyon", 30211: "vieux-lyon", 30215: "vieux-lyon",
+    50423: "vieux-lyon",
+    # villette (10 arrêts, ex: Grange Blanche, Mermoz-Pinel)
+    1087: "villette", 1089: "villette", 1095: "villette",
+    10185: "villette", 32962: "villette", 45271: "villette",
+    46422: "villette", 48370: "villette", 50260: "villette",
+    50383: "villette",
 }
 
 PARCRELAIS_URL = (
