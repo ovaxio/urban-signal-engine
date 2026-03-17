@@ -9,7 +9,11 @@ from datetime import date as date_type
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from services.ingestion import fetch_all_signals
 from services.scoring import score_all_zones, compute_forecast, NEIGHBORS, ZONE_NAMES, BASELINE, _effective_baseline
-from services.storage import save_scores_history, get_zone_history, get_recent_alerts
+from services.storage import (
+    save_scores_history, get_zone_history, get_recent_alerts,
+    save_forecast_history, evaluate_forecasts, flag_incident_surprises,
+    get_forecast_accuracy,
+)
 from services.alerts import check_alerts, dispatch_alerts
 from services.events import compute_event_signals, STATIC_EVENTS
 from config import CACHE_TTL_SECONDS, ENABLE_HISTORY
@@ -22,6 +26,7 @@ _cache: dict = {
     "signals":           None,
     "incident_schedule": {},   # Dict[zone_id, Dict[int, float]] — incidents planifiés
     "incident_events":   {},   # Dict[zone_id, List[dict]]        — détails événements actifs
+    "weather_forecast":  {},   # Dict[str, float]                  — météo horaire prévue (48h)
     "fetched_at":        None,
     "lock":              asyncio.Lock(),
     "prev_scores":       {},   # snapshot des scores du cycle précédent pour calcul tendance
@@ -41,11 +46,15 @@ async def _get_scores(force_refresh: bool = False) -> List[dict]:
                     z["zone_id"]: z["urban_score"] for z in _cache["scores"]
                 }
 
-            signals, incident_schedule, incident_events = await fetch_all_signals()
+            signals, incident_schedule, incident_events, weather_fc = await fetch_all_signals()
             scores  = score_all_zones(signals)
 
             if ENABLE_HISTORY:
                 save_scores_history(scores)
+
+            # Évaluer les forecasts passés par rapport aux scores actuels
+            evaluate_forecasts(scores)
+            flag_incident_surprises(incident_events)
 
             # Détection d'alertes sur franchissement de seuil
             new_alerts = check_alerts(_cache["prev_scores"], scores)
@@ -56,6 +65,7 @@ async def _get_scores(force_refresh: bool = False) -> List[dict]:
             _cache["signals"]           = signals
             _cache["incident_schedule"] = incident_schedule
             _cache["incident_events"]   = incident_events
+            _cache["weather_forecast"]  = weather_fc
             _cache["fetched_at"]        = now
 
     return _cache["scores"]
@@ -137,7 +147,13 @@ async def get_zone_forecast(zone_id: str, force_refresh: bool = Query(False)):
         incident_schedule=_cache["incident_schedule"].get(zone_id),
         bl=_effective_baseline(zone_id),
         zone_id=zone_id,
+        weather_forecast=_cache.get("weather_forecast"),
     )
+
+    # Sauvegarder le forecast pour évaluation ultérieure (throttlé)
+    if ENABLE_HISTORY:
+        save_forecast_history(zone_id, forecast, z["urban_score"])
+
     return {
         "zone_id":       zone_id,
         "zone_name":     z["zone_name"],
@@ -145,7 +161,7 @@ async def get_zone_forecast(zone_id: str, force_refresh: bool = Query(False)):
         "current_level": z["level"],
         "trend_per_min": trend,   # visible pour debug
         "forecast":      forecast,
-        "disclaimer":    "Prévision probabiliste. Non déterministe.",
+        "disclaimer":    "Prévision probabiliste. Confiance décroissante au-delà de 2h.",
     }
 
 
@@ -187,6 +203,19 @@ async def get_alerts(limit: int = Query(50, ge=1, le=200)):
 async def force_refresh(background_tasks: BackgroundTasks):
     background_tasks.add_task(_get_scores, force_refresh=True)
     return {"status": "refresh_scheduled"}
+
+
+@router.get("/forecast/accuracy")
+async def forecast_accuracy(
+    zone_id: Optional[str] = Query(None),
+    horizon: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """
+    Stats de précision des forecasts : MAE global et par horizon,
+    taux d'incidents surprises, dernières évaluations.
+    """
+    return get_forecast_accuracy(zone_id=zone_id, horizon=horizon, limit=limit)
 
 
 def _parse_sim_date(date: str) -> date_type:

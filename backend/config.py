@@ -57,7 +57,9 @@ CONV_BETA_SUM_MAX: float = 3.5
 CONV_THETA_EPSILON: float = 0.05
 
 SPATIAL_KERNEL_DECAY: float = 0.6
+# Horizons courts (temps réel) + étendus (structurels)
 FORECAST_HORIZONS: List[int] = [30, 60, 120]
+FORECAST_HORIZONS_EXTENDED: List[int] = [360, 720, 1440]  # 6h, 12h, 24h
 # Criter : 2 appels/refresh (trafic + incidents), sans quota → TTL 60s
 CACHE_TTL_SECONDS: int = 60
 ENABLE_HISTORY: bool = os.getenv("ENABLE_HISTORY", "true").lower() == "true"
@@ -78,6 +80,14 @@ class ExternalAPIs:
         "?latitude=45.748&longitude=4.847"
         "&current=precipitation,wind_speed_10m,temperature_2m,weather_code"
         "&timezone=Europe/Paris"
+    )
+    # Open-Meteo forecast horaire (precipitation, vent, weather_code sur 48h)
+    WEATHER_FORECAST_URL = (
+        "https://api.open-meteo.com/v1/forecast"
+        "?latitude=45.748&longitude=4.847"
+        "&hourly=precipitation,wind_speed_10m,weather_code"
+        "&timezone=Europe/Paris"
+        "&forecast_days=2"
     )
     TCL_GTFS_RT_URL       = "https://data.sytral.fr/gtfs-rt/vehicle_positions"
     TCL_DISRUPTIONS_URL   = "https://data.sytral.fr/api/disruptions"

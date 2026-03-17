@@ -7,6 +7,7 @@ import styles from "./AppNav.module.css";
 const LINKS = [
   { href: "/dashboard", label: "Tableau de bord", matchAlso: ["/zones"] },
   { href: "/reports",   label: "Rapports d'impact" },
+  { href: "/admin/forecast-accuracy", label: "Forecast" },
   { href: "/",          label: "Vitrine", exact: true },
   { href: "/contact",   label: "Contact" },
 ];

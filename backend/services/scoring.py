@@ -68,7 +68,7 @@ LYON_TZ = ZoneInfo("Europe/Paris")
 
 from config import (
     EPSILON, WEIGHTS, LAMBDA, THETA, ALPHA, BETA,
-    SPATIAL_KERNEL_DECAY, FORECAST_HORIZONS,
+    SPATIAL_KERNEL_DECAY, FORECAST_HORIZONS, FORECAST_HORIZONS_EXTENDED,
 )
 
 import logging as _logging
@@ -479,18 +479,20 @@ def compute_forecast(
     dt: datetime = None,
     trend: float = 0.0,                         # points/min
     signals: dict = None,                        # signaux bruts — pour extraction incident
-    incident_schedule: Dict[int, float] = None,  # {30: v, 60: v, 120: v} planifié
+    incident_schedule: Dict[int, float] = None,  # {30: v, 60: v, 120: v, ...} planifié
     bl: Dict = None,                             # baseline effective de la zone
     zone_id: str = None,                         # pour lookup profils horaires
+    weather_forecast: Dict[str, float] = None,   # {"2026-03-17T18:00": score, ...}
 ) -> List[dict]:
     """
-    Prévision probabiliste sur 30/60/120 min.
-    Intègre :
-      - phi futur (heures de pointe)
-      - tendance récente (delta score / min)
-      - profils horaires historiques : projette les signaux bruts à chaque horizon
-        en interpolant entre la valeur actuelle et la moyenne historique à cette heure
-      - incidents planifiés (starttime/endtime Criter)
+    Prévision probabiliste sur horizons courts (30/60/120 min) et étendus (6/12/24h).
+
+    Horizons courts (0-2h) : 3 scénarios max-wins à partir des signaux temps réel.
+    Horizons étendus (6-24h) : modèle structurel basé sur :
+      - φ(t+h) profil temporel du jour futur
+      - profils horaires historiques (moyennes par heure/day_type)
+      - météo prévue (Open-Meteo hourly forecast)
+      - incidents persistants (travaux Criter avec endtime > t+h)
     """
     if dt is None:
         dt = datetime.now(timezone.utc)
@@ -512,6 +514,10 @@ def compute_forecast(
             pass  # fallback : forecast classique sans projection
 
     results = []
+
+    # ══════════════════════════════════════════════════════════════════
+    # HORIZONS COURTS (30/60/120 min) — signaux temps réel
+    # ══════════════════════════════════════════════════════════════════
     for h in FORECAST_HORIZONS:
         future_dt  = dt + timedelta(minutes=h)
         phi_future = compute_phi(future_dt)
@@ -520,16 +526,8 @@ def compute_forecast(
         # ── Forecast à 3 scénarios (max wins) ─────────────────────────
         #
         # 1. Persistance décayée : alert × decay × phi_ratio
-        #    → modèle classique, bon pour signaux transitoires
-        #
-        # 2. Situation maintenue + phi futur : recalcule l'alert
-        #    avec les mêmes signaux mais phi à l'heure future
-        #    → capte : "si les travaux/incidents actuels persistent au rush,
-        #              le score monte car φ amplifie"
-        #
-        # 3. Projection avec incident_schedule Criter :
-        #    → utilise le decay par type (travaux=persist, bouchon=decay rapide)
-        #    + profils historiques pour les signaux structurels
+        # 2. Situation maintenue + phi futur
+        # 3. Projection avec incident_schedule Criter
         #
         # On prend le MAX → le forecast reflète le pire scénario réaliste
 
@@ -542,26 +540,14 @@ def compute_forecast(
             fa_persist = alert * decay * phi_ratio
 
             # --- 2. Situation maintenue + phi futur ---
-            # Même signaux qu'actuellement, mais phi à l'heure future.
-            # "Si rien ne change, quel est le score à 17h ?"
-            #
-            # Ajustement trafic : si le rush approche (phi_future > phi_now),
-            # on interpole le trafic actuel vers mu (congestion moyenne).
-            # Criter capte la congestion réelle, mais la projection forward
-            # utilise le ratio phi pour anticiper l'intensification.
             maintained_signals = dict(signals)
             if phi_future > phi_now and "traffic" in maintained_signals:
-                # Le trafic brut augmente vers la baseline au rush
-                # phi_ratio > 1 → on rapproche le trafic de mu (congestion)
                 traffic_now = maintained_signals["traffic"]
                 traffic_mu = _bl["traffic"]["mu"]
                 phi_r = phi_future / phi_now
-                # Interpolation vers mu proportionnelle au ratio phi
-                # À phi_ratio=1.55 → ~35% vers mu, à phi_ratio=1.0 → 0%
-                interp = min(max((phi_r - 1.0) * 0.6, 0.0), 0.5)  # [0, 0.5] — jamais négatif
+                interp = min(max((phi_r - 1.0) * 0.6, 0.0), 0.5)
                 maintained_signals["traffic"] = traffic_now + interp * (traffic_mu - traffic_now)
 
-            # Profils historiques : max(actuel, historique) pour transport
             for sig in ("transport",):
                 hist_val = profile_at_h.get(sig)
                 if hist_val is not None and sig in maintained_signals:
@@ -577,12 +563,8 @@ def compute_forecast(
             # --- 3. Projection avec schedule + profils historiques ---
             fa_proj = 0.0
             if incident_schedule and h in incident_schedule:
-                # Le schedule Criter intègre la durée par type :
-                #   travaux (type 9) → factor=1.0 (persistent)
-                #   bouchon (type 6) → factor décroissant (transitoire)
                 proj_signals = dict(signals)
                 proj_signals["incident"] = incident_schedule[h]
-                # Enrichir avec max(actuel, historique) pour traffic/transport
                 for sig in ("traffic", "transport"):
                     hist_val = profile_at_h.get(sig)
                     if hist_val is not None:
@@ -614,7 +596,6 @@ def compute_forecast(
             fa  = alert * decay * phi_ratio
             fa += trend_contrib * 0.3
 
-            # Remplacement incident planifié
             if signals and incident_schedule and h in incident_schedule:
                 incident_now  = signals.get("incident", 0.0)
                 z_inc_now     = normalize(incident_now, "incident", _bl)
@@ -634,10 +615,85 @@ def compute_forecast(
         fs = max(0, min(100, fs))
 
         results.append({
-            "horizon_min": h,
+            "horizon": f"{h}min" if h <= 60 else f"{h // 60}h",
             "urban_score": fs,
             "level":       score_level(fs),
             "phi":         round(phi_future, 2),
+            "confidence":  "high",
+        })
+
+    # ══════════════════════════════════════════════════════════════════
+    # HORIZONS ÉTENDUS (6h/12h/24h) — modèle structurel
+    # ══════════════════════════════════════════════════════════════════
+    # Au-delà de 2h, les signaux temps réel sont périmés.
+    # On reconstruit le score from scratch à partir de :
+    #   - φ(t+h) : profil temporel du jour futur (cross-jour correct)
+    #   - profils historiques : moyennes par heure/day_type
+    #   - météo prévue : Open-Meteo hourly (seul signal fiable à 24h)
+    #   - incidents persistants : travaux Criter encore actifs à t+h
+
+    for h in FORECAST_HORIZONS_EXTENDED:
+        future_dt   = dt + timedelta(minutes=h)
+        phi_future  = compute_phi(future_dt)
+        future_hour = future_dt.hour
+
+        # Profils historiques pour le jour futur (peut être un autre day_type)
+        future_day_type = _day_type(future_dt)
+        ext_profiles: Dict[int, Dict[str, float]] = {}
+        if zone_id:
+            try:
+                from services.storage import get_hourly_signal_profiles
+                ext_profiles = get_hourly_signal_profiles(zone_id, day_type=future_day_type)
+                if len(ext_profiles) < 12:
+                    ext_profiles = get_hourly_signal_profiles(zone_id)
+            except Exception:
+                pass
+
+        profile_at_h = ext_profiles.get(future_hour, {})
+
+        # Construire les signaux structurels
+        struct_signals: Dict[str, float] = {}
+        for sig in ("traffic", "weather", "event", "transport", "incident"):
+            # Base : profil historique pour cette heure
+            struct_signals[sig] = profile_at_h.get(sig, _bl[sig]["mu"])
+
+        # Météo prévue remplace la moyenne historique (seul signal fiable à 6h+)
+        if weather_forecast:
+            # Clé Open-Meteo : "2026-03-17T18:00" (heure locale Europe/Paris)
+            future_local = future_dt.astimezone(LYON_TZ)
+            wf_key = future_local.strftime("%Y-%m-%dT%H:00")
+            wf_score = weather_forecast.get(wf_key)
+            if wf_score is not None:
+                struct_signals["weather"] = wf_score
+
+        # Incidents persistants (travaux avec endtime > t+h)
+        if incident_schedule and h in incident_schedule:
+            inc_val = incident_schedule[h]
+            if inc_val > 0:
+                struct_signals["incident"] = max(struct_signals["incident"], inc_val)
+
+        # Calcul du score structurel
+        # L'anomaly est modulée par phi : un incident à 1h du matin
+        # a moins d'impact qu'à 8h (personne n'est impacté la nuit).
+        risk_ext    = compute_risk(struct_signals, phi_future, _bl)
+        anomaly_raw = compute_anomaly(struct_signals, _bl)
+        anomaly_ext = anomaly_raw * min(phi_future, 1.0)
+        conv_ext    = compute_conv(struct_signals, _bl)
+        fa_ext      = compute_alert(risk_ext, anomaly_ext, conv_ext)
+
+        # Pas de spread à long terme (les voisins évoluent indépendamment)
+        fs_ext = compute_urban_score(fa_ext, 0.0)
+        fs_ext = max(0, min(100, fs_ext))
+
+        # Confidence décroît avec l'horizon
+        conf = "medium" if h <= 720 else "low"
+
+        results.append({
+            "horizon": f"{h // 60}h",
+            "urban_score": fs_ext,
+            "level":       score_level(fs_ext),
+            "phi":         round(phi_future, 2),
+            "confidence":  conf,
         })
 
     return results

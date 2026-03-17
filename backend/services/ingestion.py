@@ -75,6 +75,66 @@ async def fetch_weather() -> Dict[str, float]:
     return {z: round(score, 3) for z in ZONE_CENTROIDS}
 
 # ---------------------------------------------------------------------------
+# Météo forecast horaire — Open-Meteo (prévision 48h, gratuit)
+# ---------------------------------------------------------------------------
+
+_weather_forecast_cache: dict = {"data": None, "ts": None}
+_WEATHER_FORECAST_TTL = 1800  # 30 min — les prévisions horaires ne changent pas vite
+
+
+def _weather_score_from_values(precip: float, wind: float, wmo: int) -> float:
+    """Même logique que fetch_weather() — score météo [0, 3.0]."""
+    score = 0.0
+    score += min(precip / 5.0, 1.5)
+    score += 0.5 if wind > 50 else 0.0
+    score += 1.5 if wmo >= 95 else (0.8 if wmo >= 61 else 0.0)
+    return min(score, 3.0)
+
+
+async def fetch_weather_forecast() -> Dict[str, float]:
+    """
+    Récupère le forecast météo horaire Open-Meteo (48h).
+    Retourne un dict {iso_hour_str: weather_score} indexé par heure ISO arrondie.
+    Ex: {"2026-03-17T18:00": 0.8, "2026-03-17T19:00": 0.0, ...}
+    Cache 30 min — les prévisions horaires changent peu.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    # Check cache
+    if (
+        _weather_forecast_cache["data"] is not None
+        and _weather_forecast_cache["ts"] is not None
+        and (now - _weather_forecast_cache["ts"]).total_seconds() < _WEATHER_FORECAST_TTL
+    ):
+        return _weather_forecast_cache["data"]
+
+    async with httpx.AsyncClient() as client:
+        data = await safe_get(client, APIS.WEATHER_FORECAST_URL)
+
+    if not data or "hourly" not in data:
+        log.warning("[weather-forecast] Pas de données → vide")
+        return {}
+
+    hourly = data["hourly"]
+    times  = hourly.get("time", [])
+    precip = hourly.get("precipitation", [])
+    wind   = hourly.get("wind_speed_10m", [])
+    wmo    = hourly.get("weather_code", [])
+
+    result: Dict[str, float] = {}
+    for i, t in enumerate(times):
+        p = float(precip[i]) if i < len(precip) and precip[i] is not None else 0.0
+        w = float(wind[i])   if i < len(wind) and wind[i] is not None else 0.0
+        c = int(wmo[i])      if i < len(wmo) and wmo[i] is not None else 0
+        result[t] = round(_weather_score_from_values(p, w, c), 3)
+
+    _weather_forecast_cache["data"] = result
+    _weather_forecast_cache["ts"] = now
+    log.info("[weather-forecast] %d heures de prévision chargées", len(result))
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Trafic — Grand Lyon Criter (données officielles, sans quota)
 # ---------------------------------------------------------------------------
 
@@ -184,7 +244,7 @@ def _multipoint_centroid(coords: list) -> Optional[tuple]:
     return float(coords[1]), float(coords[0])
 
 
-_INCIDENT_HORIZONS = [0, 30, 60, 120]   # minutes (0 = maintenant)
+_INCIDENT_HORIZONS = [0, 30, 60, 120, 360, 720, 1440]   # minutes (0 = maintenant, +6h, +12h, +24h)
 
 
 def _is_event_active_at(props: dict, target: datetime.datetime) -> bool:
@@ -308,9 +368,9 @@ async def fetch_incidents() -> tuple:
             f"count={len(h_zone_weights[0][z])} score={current[z]}"
         )
 
-    # Schedule (h=30/60/120)
+    # Schedule (tous horizons sauf h=0)
     schedule: Dict[str, Dict[int, float]] = {
-        z: {h: _zone_score_from_weights(h_zone_weights[h][z]) for h in [30, 60, 120]}
+        z: {h: _zone_score_from_weights(h_zone_weights[h][z]) for h in _INCIDENT_HORIZONS if h > 0}
         for z in ZONE_CENTROIDS
     }
 
@@ -694,14 +754,17 @@ def _deterministic_fallback(zone_id: str) -> float:
 async def fetch_all_signals() -> tuple:
     """
     Retourne :
-        signals           : Dict[str, Dict[str, float]]   — signaux par zone
-        incident_schedule : Dict[str, Dict[int, float]]   — incidents planifiés t+30/60/120
+        signals            : Dict[str, Dict[str, float]]   — signaux par zone
+        incident_schedule  : Dict[str, Dict[int, float]]   — incidents planifiés t+30/60/120
+        incident_events    : Dict[str, List[dict]]          — détails événements actifs
+        weather_forecast   : Dict[str, float]               — météo horaire prévue (48h)
     """
-    weather_t, event_t, traffic_t, incident_result = await asyncio.gather(
+    weather_t, event_t, traffic_t, incident_result, weather_fc = await asyncio.gather(
         fetch_weather(),
         fetch_event_signals(),
         fetch_traffic(),
         fetch_incidents(),
+        fetch_weather_forecast(),
     )
     incident_t, incident_schedule, incident_events = incident_result
 
@@ -746,4 +809,4 @@ async def fetch_all_signals() -> tuple:
         }
         log.info("[smoothing] EWM appliqué sur %d zones.", len(result))
 
-    return result, incident_schedule, incident_events
+    return result, incident_schedule, incident_events, weather_fc

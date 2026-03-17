@@ -59,9 +59,10 @@ export type Alert = {
 };
 
 export type ForecastHorizon = {
-  horizon_min: number;
+  horizon: string;
   urban_score: number;
   level: string;
+  confidence?: "high" | "medium" | "low";
 };
 
 export type Forecast = {
@@ -145,4 +146,36 @@ export type CalendarEvent = {
   zone: string;
   zone_name: string;
   weight: number;
+};
+
+// ── Forecast Accuracy ──────────────────────────────────────────────────────
+
+export type ForecastAccuracyHorizon = {
+  horizon: string;
+  n: number;
+  mae: number | null;
+  mae_clean: number | null;
+  n_surprise: number;
+  bias: number | null;
+  min_delta: number | null;
+  max_delta: number | null;
+};
+
+export type ForecastEvaluation = {
+  ts_forecast: string;
+  zone_id: string;
+  horizon: string;
+  predicted_score: number;
+  actual_score: number;
+  delta: number;
+  incident_surprise: number;
+  evaluated_at: string;
+};
+
+export type ForecastAccuracy = {
+  total_evaluated: number;
+  mae_global: number | null;
+  incident_surprises: number;
+  by_horizon: ForecastAccuracyHorizon[];
+  recent: ForecastEvaluation[];
 };

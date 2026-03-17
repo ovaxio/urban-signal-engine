@@ -24,9 +24,9 @@ export default function ZoneForecast({ forecast }: Props) {
           <div style={{ fontSize: 10, color: scoreColor(forecast.current_score), marginTop: 3 }}>{forecast.current_level}</div>
         </div>
         {forecast.forecast.map(f => (
-          <div key={f.horizon_min} style={{ textAlign: "center", padding: 14, background: "var(--bg-inner)", borderRadius: 8, border: `1px solid ${scoreColor(f.urban_score)}33` }}>
-            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5 }}>+{f.horizon_min} min</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(f.urban_score) }}><ForecastScore value={f.urban_score} /></div>
+          <div key={f.horizon} style={{ textAlign: "center", padding: 14, background: "var(--bg-inner)", borderRadius: 8, border: `1px solid ${scoreColor(f.urban_score)}33` }}>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5 }}>+{f.horizon}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(f.urban_score), opacity: f.confidence === "low" ? 0.6 : 1 }}><ForecastScore value={f.urban_score} /></div>
             <div style={{ fontSize: 10, color: scoreColor(f.urban_score), marginTop: 3 }}>{f.level}</div>
           </div>
         ))}

@@ -72,3 +72,13 @@ export async function fetchEvents() {
   if (!r.ok) throw new Error(`/reports/events ${r.status}`);
   return r.json();
 }
+
+export async function fetchForecastAccuracy(params?: { zone_id?: string; horizon?: string; limit?: number }) {
+  const q = new URLSearchParams();
+  if (params?.zone_id) q.set("zone_id", params.zone_id);
+  if (params?.horizon) q.set("horizon", params.horizon);
+  if (params?.limit)   q.set("limit", String(params.limit));
+  const r = await fetch(`${BASE}/zones/forecast/accuracy?${q}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`/zones/forecast/accuracy ${r.status}`);
+  return r.json();
+}

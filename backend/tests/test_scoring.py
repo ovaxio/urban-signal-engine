@@ -317,10 +317,10 @@ class TestEndToEndScenarios:
 # ─── compute_forecast ──────────────────────────────────────────────────────────
 
 class TestComputeForecast:
-    def test_returns_three_horizons(self):
+    def test_returns_six_horizons(self):
         fc = compute_forecast(45, 2.0, 0.5, dt=DT_RUSH)
-        assert len(fc) == 3
-        assert [f["horizon_min"] for f in fc] == [30, 60, 120]
+        assert len(fc) == 6
+        assert [f["horizon"] for f in fc] == ["30min", "60min", "2h", "6h", "12h", "24h"]
 
     def test_scores_in_range(self):
         fc = compute_forecast(50, 2.0, 0.5, dt=DT_RUSH)
@@ -710,7 +710,7 @@ class TestForecast3Scenarios:
     def test_fallback_without_signals(self):
         """Sans signaux bruts, le forecast fonctionne (mode dégradé)."""
         fc = compute_forecast(50, 2.0, 0.5, dt=DT_RUSH)
-        assert len(fc) == 3
+        assert len(fc) == 6
         for f in fc:
             assert 0 <= f["urban_score"] <= 100
 
@@ -726,7 +726,7 @@ class TestForecast3Scenarios:
         # (decay faible à 30min : exp(-30/240) ≈ 0.88)
         for f in fc:
             assert f["urban_score"] >= 20, (
-                f"Score forecast trop bas: {f['urban_score']} à +{f['horizon_min']}min"
+                f"Score forecast trop bas: {f['urban_score']} à +{f['horizon']}"
             )
 
 
@@ -854,3 +854,87 @@ class TestScoreNeutralSemantics:
         alert = compute_alert(risk, anom, conv)
         score = compute_urban_score(alert, 0.0)
         assert score_level(score) == "CALME", f"signaux baseline → score {score} ({score_level(score)})"
+
+
+# ─── E. Forecast étendu (6h/12h/24h) ─────────────────────────────────────────
+
+class TestForecastExtended:
+    """Tests du forecast structurel sur horizons étendus (6h, 12h, 24h)."""
+
+    _EXTENDED = {"6h", "12h", "24h"}
+    _SHORT = {"30min", "60min", "2h"}
+
+    def test_extended_horizons_present(self):
+        """Le forecast retourne bien les 3 horizons étendus."""
+        fc = compute_forecast(45, 2.0, 0.5, dt=DT_RUSH, signals=SIGNALS_RUSH, bl=BASELINE)
+        extended = [f for f in fc if f["horizon"] in self._EXTENDED]
+        assert len(extended) == 3
+        assert [f["horizon"] for f in extended] == ["6h", "12h", "24h"]
+
+    def test_extended_scores_in_range(self):
+        """Les scores étendus sont dans [0, 100]."""
+        fc = compute_forecast(45, 2.0, 0.5, dt=DT_RUSH, signals=SIGNALS_RUSH, bl=BASELINE)
+        for f in fc:
+            assert 0 <= f["urban_score"] <= 100
+
+    def test_extended_confidence_decreasing(self):
+        """La confiance décroît : high → medium → low."""
+        fc = compute_forecast(45, 2.0, 0.5, dt=DT_RUSH, signals=SIGNALS_RUSH, bl=BASELINE)
+        short = [f for f in fc if f["horizon"] in self._SHORT]
+        extended = [f for f in fc if f["horizon"] in self._EXTENDED]
+        assert all(f["confidence"] == "high" for f in short)
+        assert extended[0]["confidence"] == "medium"   # 6h
+        assert extended[1]["confidence"] == "medium"   # 12h
+        assert extended[2]["confidence"] == "low"       # 24h
+
+    def test_weather_forecast_impacts_extended(self):
+        """La météo prévue modifie les scores étendus."""
+        from datetime import timedelta
+        from zoneinfo import ZoneInfo
+
+        LYON_TZ = ZoneInfo("Europe/Paris")
+        weather_storm = {}
+        for i in range(48):
+            future = DT_RUSH + timedelta(hours=i)
+            local = future.astimezone(LYON_TZ)
+            key = local.strftime("%Y-%m-%dT%H:00")
+            weather_storm[key] = 3.0
+
+        fc_no_wf = compute_forecast(
+            45, 2.0, 0.5, dt=DT_RUSH, signals=SIGNALS_RUSH, bl=BASELINE,
+            weather_forecast=None,
+        )
+        fc_storm = compute_forecast(
+            45, 2.0, 0.5, dt=DT_RUSH, signals=SIGNALS_RUSH, bl=BASELINE,
+            weather_forecast=weather_storm,
+        )
+        ext_no = [f for f in fc_no_wf if f["horizon"] in self._EXTENDED]
+        ext_st = [f for f in fc_storm if f["horizon"] in self._EXTENDED]
+        deltas = [s["urban_score"] - n["urban_score"] for s, n in zip(ext_st, ext_no)]
+        assert any(d > 0 for d in deltas), f"Tempête sans effet : deltas={deltas}"
+
+    def test_night_forecast_is_calme(self):
+        """Un forecast à +6h qui tombe la nuit devrait être CALME (φ bas)."""
+        dt_evening = DT_RUSH.replace(hour=18, minute=0)
+        fc = compute_forecast(
+            45, 2.0, 0.5, dt=dt_evening, signals=SIGNALS_NEUTRAL, bl=BASELINE,
+        )
+        h6 = next(f for f in fc if f["horizon"] == "6h")
+        assert h6["phi"] < 0.7, f"φ nuit = {h6['phi']}, attendu < 0.7"
+
+    def test_short_horizons_unchanged(self):
+        """Les horizons courts ne sont pas affectés par weather_forecast."""
+        fc_no_wf = compute_forecast(
+            45, 2.0, 0.5, dt=DT_RUSH, signals=SIGNALS_RUSH, bl=BASELINE,
+            weather_forecast=None,
+        )
+        fc_wf = compute_forecast(
+            45, 2.0, 0.5, dt=DT_RUSH, signals=SIGNALS_RUSH, bl=BASELINE,
+            weather_forecast={"2025-01-01T00:00": 3.0},
+        )
+        short_no = [f for f in fc_no_wf if f["horizon"] in self._SHORT]
+        short_wf = [f for f in fc_wf if f["horizon"] in self._SHORT]
+        for a, b in zip(short_no, short_wf):
+            assert a["urban_score"] == b["urban_score"], (
+                f"Horizon {a['horizon']} modifié par weather_forecast"
+            )
