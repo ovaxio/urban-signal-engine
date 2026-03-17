@@ -55,6 +55,7 @@ export type ZoneDetail = {
   neighbors: ZoneNeighbor[];
   sim_events?: string[];
   transport_detail?: TransportDetail;
+  weights?: Record<string, number>;
 };
 
 export type Alert = {

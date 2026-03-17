@@ -16,7 +16,7 @@ from services.storage import (
 )
 from services.alerts import check_alerts, dispatch_alerts
 from services.events import compute_event_signals, STATIC_EVENTS
-from config import CACHE_TTL_SECONDS, ENABLE_HISTORY
+from config import CACHE_TTL_SECONDS, ENABLE_HISTORY, WEIGHTS
 
 log = logging.getLogger("router.zones")
 router = APIRouter(prefix="/zones", tags=["zones"])
@@ -128,6 +128,7 @@ async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
         "neighbors":       neighbors,
         "incident_events": _cache["incident_events"].get(zone_id, []),
         "transport_detail": _cache["transport_detail"].get(zone_id),
+        "weights":         {k: round(v * 100) for k, v in WEIGHTS.items()},
     }
 
 

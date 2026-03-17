@@ -8,14 +8,6 @@ export const SIGNAL_LABELS: Record<string, string> = {
   incident:  "Incidents",
 };
 
-export const SIGNAL_WEIGHTS: Record<string, number> = {
-  traffic:   30,
-  weather:   10,
-  event:      5,
-  transport: 25,
-  incident:  30,
-};
-
 export const EVENT_ICONS: Record<string, string> = {
   roadClosed:        "🚧",
   march:             "✊",

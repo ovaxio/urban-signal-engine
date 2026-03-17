@@ -4,11 +4,11 @@ from typing import Dict, List
 EPSILON: float = 0.001
 
 WEIGHTS: Dict[str, float] = {
-    "traffic":   0.30,
-    "weather":   0.10,
-    "event":     0.05,
-    "transport": 0.25,
-    "incident":  0.30,  # ← nouveau signal
+    "traffic":   0.35,
+    "incident":  0.25,
+    "transport": 0.15,
+    "weather":   0.15,
+    "event":     0.10,
 }
 
 LAMBDA: Dict[str, float] = {

@@ -217,7 +217,7 @@ BASELINE = {
     "traffic":   {"mu": 1.05, "sigma": 0.15},   # Criter : V≈1.0, O≈2.0, R≈2.8, N≈3.0 — recalibré auto
     "weather":   {"mu": 0.3,  "sigma": 0.35},
     "event":     {"mu": 0.2,  "sigma": 0.3},     # non-stationnaire — exclu de la calibration auto
-    "transport": {"mu": 0.45, "sigma": 0.35},
+    "transport": {"mu": 0.50, "sigma": 0.28},
     "incident":  {"mu": 0.8,  "sigma": 0.6},
 }
 

@@ -249,6 +249,8 @@ _INCIDENT_HORIZONS = [0, 30, 60, 120, 360, 720, 1440]   # minutes (0 = maintenan
 
 def _is_event_active_at(props: dict, target: datetime.datetime) -> bool:
     """Retourne True si l'événement est actif à l'instant `target`."""
+    from zoneinfo import ZoneInfo
+    _PARIS = ZoneInfo("Europe/Paris")
     start_s = props.get("starttime")
     end_s   = props.get("endtime")
     if not start_s or not end_s:
@@ -256,10 +258,11 @@ def _is_event_active_at(props: dict, target: datetime.datetime) -> bool:
     try:
         start = datetime.datetime.fromisoformat(start_s)
         end   = datetime.datetime.fromisoformat(end_s)
+        # Criter WFS renvoie des dates naive en heure locale Paris
         if start.tzinfo is None:
-            start = start.replace(tzinfo=datetime.timezone.utc)
+            start = start.replace(tzinfo=_PARIS)
         if end.tzinfo is None:
-            end = end.replace(tzinfo=datetime.timezone.utc)
+            end = end.replace(tzinfo=_PARIS)
         return start <= target <= end
     except (ValueError, TypeError):
         return True  # échec parsing → inclure par défaut
@@ -415,7 +418,7 @@ async def fetch_incidents() -> tuple:
         try:
             end_dt = datetime.datetime.fromisoformat(end_s)
             if end_dt.tzinfo is None:
-                end_dt = end_dt.replace(tzinfo=datetime.timezone.utc)
+                end_dt = end_dt.replace(tzinfo=PARIS_TZ)
             end_fmt   = end_dt.astimezone(PARIS_TZ).strftime("%-d %b %H:%M")
             ends_soon = now <= end_dt <= now + datetime.timedelta(hours=2)
         except (ValueError, TypeError):
@@ -709,7 +712,7 @@ async def _fetch_passages() -> Dict[str, float]:
         delai_min = _parse_delai(str(delai_raw))
         if delai_min is not None and delai_min <= 15:
             zone_count[zone] = zone_count.get(zone, 0) + 1
-    return {z: min(cnt / SEUIL_PASSAGES, 1.0) for z, cnt in zone_count.items()}
+    return {z: 1.0 - min(cnt / SEUIL_PASSAGES, 1.0) for z, cnt in zone_count.items()}
 
 async def _fetch_velov() -> Dict[str, float]:
     async with httpx.AsyncClient(timeout=15) as client:

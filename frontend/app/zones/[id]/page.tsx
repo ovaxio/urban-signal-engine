@@ -76,7 +76,7 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
       <main style={{ maxWidth: 700, margin: "0 auto", padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
 
         <ZoneScoreHeader zone={detail} simDate={simDate} />
-        <ZoneSignals signals={detail.signals} />
+        <ZoneSignals signals={detail.signals} weights={detail.weights} />
 
         {!isSimMode && detail.transport_detail && (
           <ZoneTransportDetail detail={detail.transport_detail} />
