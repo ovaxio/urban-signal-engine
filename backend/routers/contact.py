@@ -23,6 +23,7 @@ class ContactRequest(BaseModel):
 
 
 def _init_contact_table() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS contact_submissions (
