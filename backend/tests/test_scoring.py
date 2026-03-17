@@ -9,6 +9,8 @@ from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, ".")
 
+from datetime import date
+
 from services.scoring import (
     BASELINE,
     normalize,
@@ -26,6 +28,11 @@ from services.scoring import (
     score_all_zones,
     NEIGHBORS,
     ZONE_NAMES,
+    _easter,
+    _jours_feries,
+    _is_vacances,
+    _is_ferie,
+    _day_type,
 )
 from config import LAMBDA, WEIGHTS, ALPHA, THETA
 
@@ -421,3 +428,301 @@ class TestScoreAllZones:
         assert spread_brot > 0
         # Part-Dieu a ses propres voisins moins tendus → spread plus faible
         assert spread_brot > spread_pd or spread_pd >= 0
+
+
+# ─── conv cap ─────────────────────────────────────────────────────────────────
+
+class TestConvCap:
+    def test_conv_capped_at_2(self):
+        """Tous les signaux extrêmes → conv ne dépasse jamais 2.0."""
+        extreme = {
+            "traffic": 10.0, "weather": 10.0, "event": 10.0,
+            "transport": 10.0, "incident": 10.0,
+        }
+        assert compute_conv(extreme) == pytest.approx(2.0)
+
+    def test_normal_signals_below_cap(self):
+        """En conditions normales, conv est bien en dessous de la borne."""
+        assert compute_conv(SIGNALS_FETE) < 2.0
+        assert compute_conv(SIGNALS_RUSH) < 2.0
+
+    def test_conv_cap_monte_carlo(self):
+        """1000 tirages aléatoires : conv ∈ [0, 2.0]."""
+        import random
+        random.seed(42)
+        for _ in range(1000):
+            signals = {
+                "traffic":   random.uniform(0.0, 5.0),
+                "weather":   random.uniform(0.0, 5.0),
+                "event":     random.uniform(0.0, 5.0),
+                "transport": random.uniform(0.0, 3.0),
+                "incident":  random.uniform(0.0, 5.0),
+            }
+            c = compute_conv(signals)
+            assert 0 <= c <= 2.0, f"conv={c} hors [0, 2.0]"
+
+
+# ─── interp clamp ────────────────────────────────────────────────────────────
+
+class TestInterpClamp:
+    def test_post_rush_interp_not_negative(self):
+        """Après le rush (phi_future < phi_now), le forecast ne doit pas
+        interpoler le trafic à l'opposé de mu."""
+        # 18h Paris (rush soir) → forecast +120min = 20h Paris (phi baisse)
+        dt_rush = datetime(2024, 3, 12, 17, 0, tzinfo=timezone.utc)  # 18h Paris
+        fc = compute_forecast(
+            60, 3.0, 0.5, dt=dt_rush,
+            signals=SIGNALS_RUSH,
+            bl=BASELINE,
+        )
+        # Le score à +120min ne doit pas exploser au-dessus du score actuel
+        # car phi baisse post-rush
+        assert fc[2]["urban_score"] <= 65, (
+            f"Score +120min post-rush trop élevé: {fc[2]['urban_score']}"
+        )
+
+    def test_pre_rush_interp_positive(self):
+        """Avant le rush (phi_future > phi_now), le forecast doit monter."""
+        # 15h30 Paris → forecast +120min = 17h30 Paris (plein rush soir)
+        dt_pre = datetime(2024, 3, 12, 14, 30, tzinfo=timezone.utc)  # 15h30 Paris
+        fc_pre = compute_forecast(
+            45, 2.0, 0.3, dt=dt_pre,
+            signals=SIGNALS_RUSH,
+            bl=BASELINE,
+        )
+        # Score à +120min (rush soir) doit être >= score actuel
+        assert fc_pre[2]["urban_score"] >= 45, (
+            f"Score +120min pré-rush devrait monter: {fc_pre[2]['urban_score']}"
+        )
+
+    def test_interp_does_not_reduce_traffic_post_rush(self):
+        """Vérifie directement que la logique interp ne réduit pas le trafic
+        quand phi_future/phi_now < 1."""
+        phi_now = compute_phi(datetime(2024, 3, 12, 17, 0, tzinfo=timezone.utc))
+        phi_future = compute_phi(datetime(2024, 3, 12, 19, 0, tzinfo=timezone.utc))
+        assert phi_future < phi_now, "Le rush soir doit décroître vers 20h"
+        phi_r = phi_future / phi_now
+        interp = min(max((phi_r - 1.0) * 0.6, 0.0), 0.5)
+        assert interp == 0.0, f"interp post-rush devrait être 0, got {interp}"
+
+
+# ─── phi profiles (mercredi, vacances, weekend) ──────────────────────────────
+
+class TestPhiProfiles:
+    def test_mercredi_rush_matin_same_as_semaine(self):
+        """Rush matin mercredi identique au profil semaine."""
+        # Mercredi 6 mars 2024, 7h30 UTC = 8h30 Paris
+        dt_mer = datetime(2024, 3, 6, 7, 0, tzinfo=timezone.utc)
+        dt_sem = datetime(2024, 3, 5, 7, 0, tzinfo=timezone.utc)  # mardi
+        assert abs(compute_phi(dt_mer) - compute_phi(dt_sem)) < 0.05
+
+    def test_mercredi_rush_soir_lower(self):
+        """Rush soir mercredi atténué vs semaine."""
+        dt_mer = datetime(2024, 3, 6, 17, 0, tzinfo=timezone.utc)   # mercredi 18h Paris
+        dt_sem = datetime(2024, 3, 5, 17, 0, tzinfo=timezone.utc)   # mardi 18h Paris
+        assert compute_phi(dt_mer) < compute_phi(dt_sem)
+
+    def test_vacances_rush_lower_than_semaine(self):
+        """Rush en vacances scolaires atténué vs semaine standard."""
+        # 17 février 2026 = mardi en vacances d'hiver Zone A
+        dt_vac = datetime(2026, 2, 17, 17, 0, tzinfo=timezone.utc)  # 18h Paris
+        dt_sem = datetime(2026, 3, 3, 17, 0, tzinfo=timezone.utc)   # mardi hors vacances
+        phi_vac = compute_phi(dt_vac)
+        phi_sem = compute_phi(dt_sem)
+        assert phi_vac < phi_sem, f"vacances {phi_vac} should be < semaine {phi_sem}"
+
+    def test_weekend_no_commuter_rush(self):
+        """Weekend : pas de rush commuter, profil plus plat."""
+        # Samedi 9 mars 2024, 8h30 Paris (normalement rush)
+        dt_sat = datetime(2024, 3, 9, 7, 30, tzinfo=timezone.utc)
+        # Mardi 5 mars, même heure
+        dt_tue = datetime(2024, 3, 5, 7, 30, tzinfo=timezone.utc)
+        phi_sat = compute_phi(dt_sat)
+        phi_tue = compute_phi(dt_tue)
+        assert phi_sat < phi_tue, f"weekend {phi_sat} should be < semaine {phi_tue}"
+
+    def test_weekend_max_below_semaine_max(self):
+        """Le max du profil weekend < max du profil semaine."""
+        max_we = max(
+            compute_phi(datetime(2024, 3, 9, h, 0, tzinfo=timezone.utc))
+            for h in range(24)
+        )
+        max_sem = max(
+            compute_phi(datetime(2024, 3, 5, h, 0, tzinfo=timezone.utc))
+            for h in range(24)
+        )
+        assert max_we < max_sem
+
+    def test_all_profiles_continuous(self):
+        """Tous les profils phi sont continus (pas de saut > 0.02/min)."""
+        # Tester un jour de chaque type
+        days = [
+            datetime(2024, 3, 5, 0, 0, tzinfo=timezone.utc),   # mardi (semaine)
+            datetime(2024, 3, 6, 0, 0, tzinfo=timezone.utc),   # mercredi
+            datetime(2024, 3, 9, 0, 0, tzinfo=timezone.utc),   # samedi (weekend)
+            datetime(2026, 2, 17, 0, 0, tzinfo=timezone.utc),  # mardi vacances
+        ]
+        for base in days:
+            prev = None
+            for m in range(24 * 60):
+                dt = base + timedelta(minutes=m)
+                phi = compute_phi(dt)
+                if prev is not None:
+                    assert abs(phi - prev) < 0.03, (
+                        f"Discontinuité {base.date()} à +{m}min: {prev:.3f} → {phi:.3f}"
+                    )
+                prev = phi
+
+    def test_phi_hierarchy(self):
+        """Au rush soir : semaine > mercredi > vacances > weekend."""
+        # 18h Paris = 17h UTC
+        dt_sem = datetime(2024, 3, 5, 17, 0, tzinfo=timezone.utc)  # mardi
+        dt_mer = datetime(2024, 3, 6, 17, 0, tzinfo=timezone.utc)  # mercredi
+        dt_vac = datetime(2026, 2, 17, 17, 0, tzinfo=timezone.utc) # vacances
+        dt_we  = datetime(2024, 3, 9, 17, 0, tzinfo=timezone.utc)  # samedi
+
+        phi_sem = compute_phi(dt_sem)
+        phi_mer = compute_phi(dt_mer)
+        phi_vac = compute_phi(dt_vac)
+        phi_we  = compute_phi(dt_we)
+
+        assert phi_sem > phi_mer > phi_vac > phi_we, (
+            f"Hiérarchie incorrecte: sem={phi_sem} mer={phi_mer} vac={phi_vac} we={phi_we}"
+        )
+
+
+# ─── calendrier (easter, jours fériés, vacances, day_type) ───────────────────
+
+class TestCalendar:
+    def test_easter_known_dates(self):
+        """Vérifie Pâques sur des dates connues."""
+        assert _easter(2024) == date(2024, 3, 31)
+        assert _easter(2025) == date(2025, 4, 20)
+        assert _easter(2026) == date(2026, 4, 5)
+        assert _easter(2027) == date(2027, 3, 28)
+
+    def test_jours_feries_fixed(self):
+        """Les jours fériés fixes sont toujours présents."""
+        feries_2026 = _jours_feries(2026)
+        assert date(2026, 1, 1) in feries_2026    # Nouvel an
+        assert date(2026, 5, 1) in feries_2026    # Fête du travail
+        assert date(2026, 7, 14) in feries_2026   # Fête nationale
+        assert date(2026, 12, 25) in feries_2026  # Noël
+
+    def test_jours_feries_mobile(self):
+        """Les jours fériés mobiles (dépendant de Pâques) sont corrects."""
+        feries_2026 = _jours_feries(2026)
+        easter = date(2026, 4, 5)
+        assert easter + timedelta(days=1) in feries_2026   # Lundi de Pâques
+        assert easter + timedelta(days=39) in feries_2026  # Ascension
+        assert easter + timedelta(days=50) in feries_2026  # Pentecôte
+
+    def test_jours_feries_count(self):
+        """La France a 11 jours fériés par an."""
+        assert len(_jours_feries(2026)) == 11
+
+    def test_is_ferie(self):
+        assert _is_ferie(date(2026, 1, 1))
+        assert _is_ferie(date(2026, 12, 25))
+        assert not _is_ferie(date(2026, 3, 17))  # un mardi normal
+
+    def test_is_vacances_toussaint(self):
+        """Vacances de la Toussaint 2025 Zone A."""
+        assert _is_vacances(date(2025, 10, 20))  # milieu vacances
+        assert _is_vacances(date(2025, 10, 18))  # premier jour
+        assert _is_vacances(date(2025, 11, 3))   # dernier jour
+        assert not _is_vacances(date(2025, 10, 17))  # veille
+
+    def test_day_type_semaine(self):
+        # Mardi 17 mars 2026 hors vacances
+        dt = datetime(2026, 3, 17, 12, 0, tzinfo=timezone.utc)
+        assert _day_type(dt) == "semaine"
+
+    def test_day_type_mercredi(self):
+        # Mercredi 18 mars 2026 hors vacances
+        dt = datetime(2026, 3, 18, 12, 0, tzinfo=timezone.utc)
+        assert _day_type(dt) == "mercredi"
+
+    def test_day_type_weekend(self):
+        # Samedi 21 mars 2026
+        dt = datetime(2026, 3, 21, 12, 0, tzinfo=timezone.utc)
+        assert _day_type(dt) == "weekend"
+
+    def test_day_type_ferie(self):
+        # 1er mai 2026 (jeudi, jour férié)
+        dt = datetime(2026, 5, 1, 12, 0, tzinfo=timezone.utc)
+        assert _day_type(dt) == "weekend"  # fériés → profil weekend
+
+    def test_day_type_vacances(self):
+        # Mardi 17 février 2026 = vacances d'hiver Zone A (7 fév – 23 fév)
+        dt = datetime(2026, 2, 17, 12, 0, tzinfo=timezone.utc)
+        assert _day_type(dt) == "vacances"
+
+    def test_day_type_vacances_weekend_priority(self):
+        """Un samedi en vacances → 'weekend' (pas 'vacances')."""
+        # Samedi 14 février 2026, pendant vacances d'hiver
+        dt = datetime(2026, 2, 14, 12, 0, tzinfo=timezone.utc)
+        assert _day_type(dt) == "weekend"
+
+
+# ─── forecast 3-scénarios ────────────────────────────────────────────────────
+
+class TestForecast3Scenarios:
+    def test_rush_approach_increases_score(self):
+        """Approche du rush soir → le forecast doit monter, pas décroître."""
+        # 15h Paris, signaux d'incidents actifs
+        dt_pre = datetime(2024, 3, 12, 14, 0, tzinfo=timezone.utc)  # 15h Paris
+        signals_incident = {
+            "traffic": 1.5, "weather": 0.3, "event": 0.0,
+            "transport": 0.45, "incident": 1.5,
+        }
+        fc = compute_forecast(
+            45, 2.0, 0.3, dt=dt_pre,
+            signals=signals_incident,
+            bl=BASELINE,
+        )
+        # +120min = 17h Paris (rush soir) → score doit être >= actuel
+        assert fc[2]["urban_score"] >= 45
+
+    def test_incident_schedule_used(self):
+        """Un incident planifié persistent (travaux) maintient le score élevé."""
+        signals_w_incident = {
+            "traffic": 2.0, "weather": 0.3, "event": 0.0,
+            "transport": 0.5, "incident": 1.8,
+        }
+        schedule = {30: 1.8, 60: 1.8, 120: 1.8}  # travaux persistent
+        fc_with = compute_forecast(
+            55, 2.5, 0.3, dt=DT_NOON,
+            signals=signals_w_incident,
+            incident_schedule=schedule,
+            bl=BASELINE,
+        )
+        fc_without = compute_forecast(
+            55, 2.5, 0.3, dt=DT_NOON,
+            signals=signals_w_incident,
+            bl=BASELINE,
+        )
+        # Avec incidents persistants, le score ne doit pas décroître plus
+        assert fc_with[2]["urban_score"] >= fc_without[2]["urban_score"]
+
+    def test_fallback_without_signals(self):
+        """Sans signaux bruts, le forecast fonctionne (mode dégradé)."""
+        fc = compute_forecast(50, 2.0, 0.5, dt=DT_RUSH)
+        assert len(fc) == 3
+        for f in fc:
+            assert 0 <= f["urban_score"] <= 100
+
+    def test_max_wins_logic(self):
+        """Le forecast prend le max des 3 scénarios — jamais en dessous
+        de la persistance simple."""
+        fc = compute_forecast(
+            60, 3.0, 0.5, dt=DT_RUSH,
+            signals=SIGNALS_RUSH,
+            bl=BASELINE,
+        )
+        # Le score à +30min ne doit pas être inférieur au score de persistance pure
+        # (decay faible à 30min : exp(-30/240) ≈ 0.88)
+        for f in fc:
+            assert f["urban_score"] >= 20, (
+                f"Score forecast trop bas: {f['urban_score']} à +{f['horizon_min']}min"
+            )

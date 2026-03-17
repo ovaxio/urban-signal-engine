@@ -1,3 +1,64 @@
+"""
+Urban Signal Engine — Scoring Module
+=====================================
+
+Modèle de détection de tensions urbaines en temps réel sur 12 zones lyonnaises.
+
+UrbanScore (0–100)
+------------------
+Transformation sigmoid de la somme alert + λ₄·spread.
+
+    score = sigmoid(alert + λ₄ · spread) × 100
+
+    où  alert  = λ₁·RISK + λ₂·ANOMALY + λ₃·CONV
+        spread = K · Σ max(alert_voisin, 0)
+
+Sémantique du score :
+    0–34   CALME     Fonctionnement normal, aucun signal notable.
+    35–54  MODÉRÉ    Signaux faibles, attention recommandée.
+    55–71  TENDU     Tension confirmée, surveillance active.
+    72–100 CRITIQUE  Convergence de signaux forts, intervention possible.
+
+La sigmoid est centrée à raw=1.5 (k=0.6), donc :
+    - score ≈ 29  quand raw=0 (tous signaux au niveau baseline)
+    - score = 50   quand raw=1.5 (tension médiane du modèle)
+    - score ≈ 72  quand raw=3.0 (seuil CRITIQUE)
+Score 50 n'est PAS « absence de tension » mais « niveau médian ».
+Un score neutre (signaux au baseline) se situe autour de 29.
+
+Composantes
+-----------
+RISK = φ(t) × Σ(wₛ × zₛ)
+    Risque pondéré modulé par le profil temporel φ.
+    φ amplifie les signaux au rush et les atténue la nuit.
+    Attention : φ amplifie aussi le bruit résiduel — le lissage EWM
+    (α=0.4, fenêtre=6) en amont est donc essentiel.
+
+ANOMALY = Σ(αₛ × max(zₛ, 0))
+    Détection de pics individuels. Asymétrique (ReLU) : seuls les
+    z-scores positifs contribuent. Un signal « trop calme » ne réduit
+    pas l'anomalie — choix intentionnel pour éviter qu'une nuit sans
+    trafic ne génère une fausse anomalie négative.
+
+CONV = min(Σ(βₖ × gate(zₐ) × gate(zᵦ)), 2.0)
+    Convergence : co-occurrence de signaux élevés. Bornée à 2.0
+    (théorique max ≈ 3.20) pour limiter la surpondération.
+    En pratique, conv ≤ 13% de l'alert dans le pire cas observé.
+
+SPREAD = K × Σ max(alert_voisin, 0)
+    Diffusion spatiale de tension. Positif uniquement : un voisin calme
+    ne « soulage » pas la zone — la tension est locale, le spread
+    modélise la contagion, pas la diffusion thermique.
+
+Double comptage
+---------------
+Un même signal élevé alimente RISK, ANOMALY et CONV simultanément.
+C'est intentionnel : les trois composantes capturent des aspects
+différents (niveau global, pic individuel, co-occurrence). Une vraie
+tension (signaux élevés ET corrélés) est ainsi fortement amplifiée par
+rapport à un signal isolé élevé.
+"""
+
 import math
 from datetime import datetime, date, timezone, timedelta
 from typing import List, Dict, Tuple
@@ -316,10 +377,11 @@ def compute_conv(signals: dict, bl: Dict = None) -> float:
         ("event",     "incident",  "event_incident"),
         ("transport", "incident",  "transport_incident"),
     ]
-    return sum(
+    raw = sum(
         BETA[k] * _soft_gate(S[a], THETA[a]) * _soft_gate(S[b], THETA[b])
         for a, b, k in pairs
     )
+    return min(raw, 2.0)  # borne empirique — évite surpondération en cas d'explosion simultanée
 
 
 def compute_alert(risk, anomaly, conv) -> float:
@@ -448,7 +510,7 @@ def compute_forecast(
                 phi_r = phi_future / phi_now
                 # Interpolation vers mu proportionnelle au ratio phi
                 # À phi_ratio=1.55 → ~35% vers mu, à phi_ratio=1.0 → 0%
-                interp = min((phi_r - 1.0) * 0.6, 0.5)  # max 50% vers mu
+                interp = min(max((phi_r - 1.0) * 0.6, 0.0), 0.5)  # [0, 0.5] — jamais négatif
                 maintained_signals["traffic"] = traffic_now + interp * (traffic_mu - traffic_now)
 
             # Profils historiques : max(actuel, historique) pour transport
