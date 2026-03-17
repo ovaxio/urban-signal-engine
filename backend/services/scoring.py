@@ -272,9 +272,12 @@ SIGNAL_LABELS = {
 }
 
 
+Z_CAP = 4.0  # z-score max — évite les explosions si sigma est sous-estimé
+
 def normalize(x: float, signal: str, bl: Dict[str, Dict[str, float]] = None) -> float:
     b = (bl or BASELINE)[signal]
-    return (x - b["mu"]) / (b["sigma"] + EPSILON)
+    z = (x - b["mu"]) / (b["sigma"] + EPSILON)
+    return max(-Z_CAP, min(Z_CAP, z))
 
 
 def _ramp(x: float, x0: float, x1: float, v0: float, v1: float) -> float:

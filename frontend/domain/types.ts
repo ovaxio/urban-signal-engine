@@ -34,6 +34,14 @@ export type IncidentEvent = {
   delay_min?: number;
 };
 
+export type TransportDetail = {
+  parcrelais: number | null;
+  passages_tcl: number | null;
+  velov: number | null;
+  score: number;
+  fallback: boolean;
+};
+
 export type ZoneDetail = {
   zone_id: string;
   zone_name: string;
@@ -46,6 +54,7 @@ export type ZoneDetail = {
   incident_events?: IncidentEvent[];
   neighbors: ZoneNeighbor[];
   sim_events?: string[];
+  transport_detail?: TransportDetail;
 };
 
 export type Alert = {

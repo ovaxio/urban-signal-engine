@@ -393,7 +393,7 @@ def get_calibration_baselines(
         "traffic":   0.15,
         "weather":   0.10,
         "event":     0.20,   # signal naturellement non-stationnaire
-        "transport": 0.10,
+        "transport": 0.20,   # range [0,1] — sigma trop bas → z-scores explosifs pour zones à faible transport
         "incident":  0.15,
     }
 
@@ -437,7 +437,7 @@ def get_calibration_baselines_per_zone(
     MIN_SIGMA = {
         "traffic":   0.15,
         "weather":   0.10,
-        "transport": 0.10,
+        "transport": 0.20,
         "incident":  0.15,
     }
 

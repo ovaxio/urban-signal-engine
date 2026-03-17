@@ -11,7 +11,8 @@ import ZoneIncidents      from "@/components/zone/ZoneIncidents";
 import SimBanner          from "@/components/layout/SimBanner";
 import AppHeader          from "@/components/layout/AppHeader";
 import AppNav             from "@/components/layout/AppNav";
-import ZoneHistoryChart   from "@/components/chart/ZoneHistoryChart";
+import ZoneHistoryChart      from "@/components/chart/ZoneHistoryChart";
+import ZoneTransportDetail   from "@/components/zone/ZoneTransportDetail";
 
 type PageProps = {
   params:       Promise<{ id: string }>;
@@ -76,6 +77,10 @@ export default async function ZonePage({ params, searchParams }: PageProps) {
 
         <ZoneScoreHeader zone={detail} simDate={simDate} />
         <ZoneSignals signals={detail.signals} />
+
+        {!isSimMode && detail.transport_detail && (
+          <ZoneTransportDetail detail={detail.transport_detail} />
+        )}
 
         {!isSimMode && detail.incident_events && (
           <ZoneIncidents events={detail.incident_events} />
