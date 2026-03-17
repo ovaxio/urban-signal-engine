@@ -87,21 +87,26 @@ def compute_phi(dt: datetime = None) -> float:
         if x >= x1: return v1
         return v0 + (v1 - v0) * (x - x0) / (x1 - x0)
 
-    if t < 5.0:  return 0.7                               # nuit
-    if t < 6.5:  return _ramp(t, 5.0,  6.5,  0.7, 1.0)  # réveil
-    if t < 7.0:  return _ramp(t, 6.5,  7.0,  1.0, 1.3)  # montée rush matin
-    if t < 9.5:  return 1.3                               # rush matin
-    if t < 10.5: return _ramp(t, 9.5,  10.5, 1.3, 1.0)  # fin rush matin
-    if t < 11.5: return 1.0                               # milieu matinée
-    if t < 12.0: return _ramp(t, 11.5, 12.0, 1.0, 1.1)  # montée midi
-    if t < 14.0: return 1.1                               # midi
-    if t < 15.0: return _ramp(t, 14.0, 15.0, 1.1, 1.0)  # fin midi
-    if t < 16.5: return 1.0                               # après-midi
-    if t < 17.0: return _ramp(t, 16.5, 17.0, 1.0, 1.3)  # montée rush soir
-    if t < 19.5: return 1.3                               # rush soir
-    if t < 21.0: return _ramp(t, 19.5, 21.0, 1.3, 1.0)  # fin rush soir
-    if t < 22.5: return 1.0                               # soirée
-    return _ramp(t, 22.5, 24.0, 1.0, 0.7)                # transition nuit
+    # Calibré sur données réelles Lyon (TomTom 2025, CEREMA, EMD 2015)
+    # Congestion: nuit ~5%, off-peak ~30%, rush matin ~80%, rush soir ~90%
+    # Le rush soir est plus intense que le matin à Lyon
+    if t < 5.0:  return 0.50                               # nuit (congestion ~5%)
+    if t < 6.5:  return _ramp(t, 5.0,  6.5,  0.50, 1.0)  # réveil progressif
+    if t < 7.0:  return _ramp(t, 6.5,  7.0,  1.0,  1.55) # montée rush matin
+    if t < 9.5:  return _ramp(t, 7.0,  9.5,  1.55, 1.60) # rush matin (pic 8h-9h)
+    if t < 10.5: return _ramp(t, 9.5,  10.5, 1.60, 1.10) # fin rush matin
+    if t < 11.5: return 1.10                               # creux matinée (~30%)
+    if t < 12.0: return _ramp(t, 11.5, 12.0, 1.10, 1.25) # montée midi (écoles 11h30)
+    if t < 13.5: return 1.25                               # mini-pic déjeuner (~40%)
+    if t < 14.5: return _ramp(t, 13.5, 14.5, 1.25, 1.05) # retour école/bureau 13h30
+    if t < 16.0: return 1.05                               # après-midi calme (~25%)
+    if t < 16.5: return _ramp(t, 16.0, 16.5, 1.05, 1.40) # sortie écoles 16h30
+    if t < 17.0: return _ramp(t, 16.5, 17.0, 1.40, 1.75) # montée rush soir
+    if t < 18.0: return 1.75                               # pic rush soir (congestion ~90%)
+    if t < 19.5: return _ramp(t, 18.0, 19.5, 1.75, 1.30) # décrue rush soir
+    if t < 21.0: return _ramp(t, 19.5, 21.0, 1.30, 1.00) # fin rush soir
+    if t < 22.5: return _ramp(t, 21.0, 22.5, 1.00, 0.70) # soirée → nuit
+    return _ramp(t, 22.5, 24.0, 0.70, 0.50)               # transition nuit profonde
 
 
 def compute_risk(signals: dict, phi: float, bl: Dict = None) -> float:
@@ -218,7 +223,8 @@ def compute_forecast(
         future_dt  = dt + timedelta(minutes=h)
         phi_future = compute_phi(future_dt)
         # Ratio phi cappé pour éviter qu'une nuit calme prédise TENDU au rush
-        phi_ratio  = min(phi_future / phi_now, 1.4)
+        # Cap 1.8 : cohérent avec le ratio max Lyon (rush soir 1.75 / off-peak 1.05)
+        phi_ratio  = min(phi_future / phi_now, 1.8)
 
         # Decay lent (tau=240) pour permettre au phi rush hour de compenser
         decay = math.exp(-h / 240)
