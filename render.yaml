@@ -19,3 +19,5 @@ services:
         value: "true"
       - key: ALERT_WEBHOOK_URL
         value: ""
+      - key: ALLOWED_ORIGINS
+        value: "https://urban-signal-engine.vercel.app"

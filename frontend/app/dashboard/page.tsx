@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { fetchScores, fetchHealth, fetchSimulation } from "@/lib/api";
+import { fetchScores, fetchHealth, fetchSimulation, fetchAlerts } from "@/lib/api";
 import { scoreColor } from "@/domain/scoring";
 import { REFRESH_INTERVAL } from "@/domain/constants";
-import type { ZoneSummary, HealthStatus, FilterLevel } from "@/domain/types";
+import type { ZoneSummary, HealthStatus, FilterLevel, Alert } from "@/domain/types";
 
 import DashboardHeader from "@/components/layout/DashboardHeader";
 import AppNav          from "@/components/layout/AppNav";
@@ -31,20 +31,41 @@ export default function Home() {
   const [simMode,     setSimMode]     = useState(false);
   const [simEvents,   setSimEvents]   = useState<string[]>([]);
   const [simLoading,  setSimLoading]  = useState(false);
+  const [alerts,      setAlerts]      = useState<Alert[]>([]);
 
-  // ── Live data ─────────────────────────────────────────────────
+  // ── Live data (auto-retry on cold start) ──────────────────────
+  const [loadMsg, setLoadMsg] = useState("Connexion au backend…");
+  const retryRef = useRef(0);
+
   const loadLive = useCallback(async () => {
     try {
       setError(null);
-      const [data, h] = await Promise.all([fetchScores(), fetchHealth()]);
+      const [data, h, alertData] = await Promise.all([
+        fetchScores(), fetchHealth(), fetchAlerts(10),
+      ]);
       setZones([...(data?.zones ?? [])].sort((a: ZoneSummary, b: ZoneSummary) => b.urban_score - a.urban_score));
       setHealth(h);
+      setAlerts(alertData?.alerts ?? []);
       setLastFetch(new Date());
+      retryRef.current = 0;
+      setLoading(false);
     } catch {
+      if (loading && retryRef.current < 4) {
+        retryRef.current += 1;
+        const msgs = [
+          "Connexion au backend…",
+          "Réveil du serveur en cours…",
+          "Le serveur démarre, encore quelques secondes…",
+          "Presque prêt…",
+        ];
+        setLoadMsg(msgs[retryRef.current] ?? msgs[msgs.length - 1]);
+        setTimeout(loadLive, 4000);
+        return;
+      }
       setError("Impossible de contacter le backend");
+      setLoading(false);
     }
-    finally { setLoading(false); }
-  }, []);
+  }, [loading]);
 
   useEffect(() => {
     if (simMode) return;
@@ -102,6 +123,10 @@ export default function Home() {
         <div style={{ maxWidth: 960, margin: "0 auto" }}>
           {loading ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Loading message */}
+              <div style={{ textAlign: "center", padding: "12px 0", fontSize: 12, color: "var(--text-muted)", letterSpacing: "0.04em" }}>
+                {loadMsg}
+              </div>
               {/* Skeleton stats */}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 52, flex: 1, minWidth: 120 }} />)}
@@ -143,7 +168,7 @@ export default function Home() {
               {/* Grid + Alerts */}
               <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) clamp(200px, 25%, 260px)", gap: 16, alignItems: "start" }}>
                 <ZoneGrid zones={displayed} simDate={simMode ? simDate : undefined} />
-                {!simMode && <AlertPanel />}
+                {!simMode && <AlertPanel alerts={alerts} />}
               </div>
 
               {lastFetch && !simMode && (

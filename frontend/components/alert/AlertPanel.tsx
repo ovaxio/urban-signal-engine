@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchAlerts } from "@/lib/api";
+import { useState } from "react";
 import type { Alert } from "@/domain/types";
-import { REFRESH_INTERVAL } from "@/domain/constants";
 
 const ALERT_META = {
   CRITIQUE: { emoji: "🔴", color: "#ef4444", label: "CRITIQUE" },
@@ -18,27 +16,12 @@ function timeAgo(ts: string): string {
   return `${Math.floor(diff / 3600)}h`;
 }
 
-export default function AlertPanel() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [open,   setOpen]   = useState(true);
-  const [error,  setError]  = useState<string | null>(null);
+type Props = {
+  alerts: Alert[];
+};
 
-  const load = async () => {
-    try {
-      setError(null);
-      const data = await fetchAlerts(10);
-      setAlerts(data?.alerts ?? []);
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setError("Alertes indisponibles");
-    }
-  };
-
-  useEffect(() => {
-    load();
-    const id = setInterval(load, REFRESH_INTERVAL);
-    return () => clearInterval(id);
-  }, []);
+export default function AlertPanel({ alerts }: Props) {
+  const [open, setOpen] = useState(true);
 
   const unread = alerts.filter(a => a.alert_type !== "CALME").length;
 
@@ -63,14 +46,7 @@ export default function AlertPanel() {
 
       {open && (
         <div id="alert-list" role="region" aria-label="Liste des alertes" style={{ borderTop: "1px solid var(--border)" }}>
-          {error ? (
-            <div style={{ padding: "14px", fontSize: 11, color: "var(--text-secondary)", textAlign: "center" }}>
-              {error}
-              <button onClick={load} style={{ display: "block", margin: "6px auto 0", fontSize: 10, color: "var(--accent-text)", background: "transparent", border: "none", cursor: "pointer" }}>
-                Réessayer
-              </button>
-            </div>
-          ) : alerts.length === 0 ? (
+          {alerts.length === 0 ? (
             <div style={{ padding: "14px", fontSize: 11, color: "var(--text-secondary)", textAlign: "center" }}>
               Aucune alerte enregistrée.
             </div>
