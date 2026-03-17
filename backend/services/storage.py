@@ -3,6 +3,8 @@ Urban Signal Engine — Storage Service
 Persistence SQLite pour signaux et scores historiques.
 """
 
+import csv
+import gzip
 import sqlite3
 import logging
 from contextlib import contextmanager
@@ -13,6 +15,7 @@ from typing import Any, Dict, List, Optional, Union
 logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).parent.parent / "data" / "urban_signal.db"
+SEED_PATH = Path(__file__).parent.parent / "data" / "seed_signals_history.csv.gz"
 
 CREATE_SIGNALS_HISTORY = """
 CREATE TABLE IF NOT EXISTS signals_history (
@@ -89,8 +92,91 @@ def init_db(db_path: Path = DB_PATH) -> None:
         for idx_sql in CREATE_INDEXES:
             conn.execute(idx_sql)
         _migrate_raw_columns(conn)
+        _seed_signals_history(conn, db_path)
 
     logger.info("DB initialisée : %s", db_path)
+
+
+def _seed_signals_history(conn: sqlite3.Connection, db_path: Path = DB_PATH) -> None:
+    """
+    Charge le fichier seed CSV gzippé dans signals_history si la table est vide.
+    Utilisé sur Render (filesystem éphémère) pour restaurer les profils horaires.
+
+    Les timestamps sont décalés pour que le relevé le plus récent du seed
+    corresponde à l'heure courante — les historiques et rapports d'impact
+    restent ainsi cohérents temporellement.
+    """
+    row_count = conn.execute("SELECT COUNT(*) FROM signals_history").fetchone()[0]
+    if row_count > 0:
+        logger.info("signals_history contient déjà %d lignes, seed ignoré.", row_count)
+        return
+
+    seed = SEED_PATH if db_path == DB_PATH else db_path.parent / "seed_signals_history.csv.gz"
+    if not seed.exists():
+        logger.warning("Fichier seed introuvable : %s — profils horaires vides.", seed)
+        return
+
+    logger.info("Seed signals_history depuis %s …", seed)
+
+    # ── Passe 1 : trouver le timestamp max pour calculer le décalage ──
+    max_ts: Optional[datetime] = None
+    with gzip.open(seed, "rt", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            ts_str = row.get("ts", "")
+            if ts_str:
+                ts = datetime.fromisoformat(ts_str)
+                if max_ts is None or ts > max_ts:
+                    max_ts = ts
+
+    if max_ts is None:
+        logger.warning("Seed vide ou sans timestamps, abandon.")
+        return
+
+    now = datetime.now(timezone.utc)
+    delta = now - max_ts
+    logger.info("Seed ts shift : max_ts=%s, now=%s, delta=%s", max_ts.isoformat(), now.isoformat(), delta)
+
+    # ── Passe 2 : insertion avec timestamps décalés ──
+    cols = (
+        "ts", "zone_id", "traffic", "weather", "event", "transport",
+        "urban_score", "level", "raw_traffic", "raw_weather",
+        "raw_event", "raw_transport", "raw_incident",
+    )
+    numeric = {
+        "traffic", "weather", "event", "transport", "urban_score",
+        "raw_traffic", "raw_weather", "raw_event", "raw_transport", "raw_incident",
+    }
+    placeholders = ", ".join("?" for _ in cols)
+    sql = f"INSERT INTO signals_history ({', '.join(cols)}) VALUES ({placeholders})"
+
+    inserted = 0
+    with gzip.open(seed, "rt", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        batch: list = []
+        for row in reader:
+            values = []
+            for c in cols:
+                v = row.get(c, "")
+                if v == "":
+                    values.append(None)
+                elif c == "ts":
+                    shifted = datetime.fromisoformat(v) + delta
+                    values.append(shifted.isoformat())
+                elif c in numeric:
+                    values.append(float(v))
+                else:
+                    values.append(v)
+            batch.append(tuple(values))
+            if len(batch) >= 5000:
+                conn.executemany(sql, batch)
+                inserted += len(batch)
+                batch.clear()
+        if batch:
+            conn.executemany(sql, batch)
+            inserted += len(batch)
+    conn.commit()
+    logger.info("Seed terminé : %d lignes insérées (décalage %s).", inserted, delta)
 
 
 def _migrate_raw_columns(conn: sqlite3.Connection) -> None:
