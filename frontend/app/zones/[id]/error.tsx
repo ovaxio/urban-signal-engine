@@ -16,32 +16,21 @@ export default function ZoneDetailError({
   }, [error]);
 
   return (
-    <div style={{ padding: 40, textAlign: "center", fontFamily: "monospace" }}>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, color: "var(--text-primary)" }}>
+    <div className="p-10 text-center font-mono">
+      <h2 className="mb-2 text-base font-bold text-text-primary">
         Erreur sur la page zone
       </h2>
-      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 16 }}>
+      <p className="mb-4 text-xs text-text-secondary">
         L&apos;erreur a été signalée automatiquement.
       </p>
-      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+      <div className="flex justify-center gap-3">
         <button
           onClick={reset}
-          style={{
-            fontSize: 12,
-            padding: "8px 16px",
-            cursor: "pointer",
-            background: "var(--bg-control)",
-            color: "var(--accent-text)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
-          }}
+          className="cursor-pointer rounded border border-border bg-bg-control px-4 py-2 text-xs text-accent-text"
         >
           Réessayer
         </button>
-        <Link
-          href="/dashboard"
-          style={{ fontSize: 12, padding: "8px 16px", color: "var(--text-secondary)" }}
-        >
+        <Link href="/dashboard" className="px-4 py-2 text-xs text-text-secondary">
           ← Tableau de bord
         </Link>
       </div>

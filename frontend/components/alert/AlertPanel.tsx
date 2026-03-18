@@ -26,28 +26,28 @@ export default function AlertPanel({ alerts }: Props) {
   const unread = alerts.filter(a => a.alert_type !== "CALME").length;
 
   return (
-    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+    <div className="overflow-hidden rounded-[10px] border border-border bg-bg-card">
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-controls="alert-list"
-        style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", cursor: "pointer", userSelect: "none", width: "100%", background: "transparent", border: "none", color: "inherit", font: "inherit" }}
+        className="flex w-full cursor-pointer select-none items-center gap-2 border-none bg-transparent px-3.5 py-2.5 font-inherit text-inherit"
       >
-        <span style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, letterSpacing: "0.1em", flex: 1, textAlign: "left" }}>
+        <span className="flex-1 text-left text-[10px] font-semibold tracking-widest text-text-muted">
           ALERTES
         </span>
         {unread > 0 && (
-          <span style={{ fontSize: 9, background: "#ef444422", color: "#ef4444", border: "1px solid #ef444433", borderRadius: 10, padding: "1px 7px", fontWeight: 700 }}>
+          <span className="rounded-[10px] border border-[#ef444433] bg-[#ef444422] px-1.5 py-px text-[9px] font-bold text-[#ef4444]">
             {unread}
           </span>
         )}
-        <span style={{ fontSize: 10, color: "var(--text-faint)" }} aria-hidden="true">{open ? "▲" : "▼"}</span>
+        <span className="text-[10px] text-text-faint" aria-hidden="true">{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
-        <div id="alert-list" role="region" aria-label="Liste des alertes" style={{ borderTop: "1px solid var(--border)" }}>
+        <div id="alert-list" role="region" aria-label="Liste des alertes" className="border-t border-border">
           {alerts.length === 0 ? (
-            <div style={{ padding: "14px", fontSize: 11, color: "var(--text-secondary)", textAlign: "center" }}>
+            <div className="p-3.5 text-center text-[11px] text-text-secondary">
               Aucune alerte enregistrée.
             </div>
           ) : (
@@ -57,23 +57,22 @@ export default function AlertPanel({ alerts }: Props) {
               return (
                 <div
                   key={`${a.ts}-${a.zone_id}`}
+                  className="flex items-center gap-2.5 px-3.5 py-2"
                   style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "8px 14px",
                     borderBottom: i < alerts.length - 1 ? "1px solid var(--bg-control)" : undefined,
                     background: i === 0 ? `${meta.color}08` : undefined,
                   }}
                 >
-                  <span style={{ fontSize: 13 }}>{meta.emoji}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: "var(--text-primary)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <span className="text-[13px]">{meta.emoji}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[11px] font-semibold text-text-primary">
                       {a.zone_name}
                     </div>
-                    <div style={{ fontSize: 9, color: "var(--text-faint)", marginTop: 1 }}>
+                    <div className="mt-px text-[9px] text-text-faint">
                       {meta.label} · {a.prev_score} {dir} {a.urban_score}
                     </div>
                   </div>
-                  <div style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>
+                  <div className="shrink-0 text-[10px] text-text-muted">
                     {timeAgo(a.ts)}
                   </div>
                 </div>

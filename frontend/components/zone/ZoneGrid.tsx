@@ -8,9 +8,9 @@ type Props = {
 
 export default function ZoneGrid({ zones, simDate }: Props) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, minWidth: 0 }}>
+    <div className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2.5">
       {zones.length === 0 ? (
-        <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 32, color: "var(--text-secondary)", fontSize: 12 }}>
+        <div className="col-span-full p-8 text-center text-xs text-text-secondary">
           Aucune zone ne correspond au filtre sélectionné.
         </div>
       ) : (

@@ -15,32 +15,30 @@ export default function ZoneCard({ zone, simDate }: Props) {
 
   return (
     <Link href={href}>
-      <div className="zone-card" style={{
-        background: isAlert ? `${col}0d` : "var(--bg-card)",
-        border: `1px solid ${col}${isAlert ? "66" : "33"}`,
-        borderRadius: 10,
-        padding: "14px 16px",
-        cursor: "pointer",
-        boxShadow: isAlert ? `0 0 14px ${col}22` : "none",
-        position: "relative",
-        minWidth: 0,
-      }}>
+      <div
+        className="zone-card relative min-w-0 cursor-pointer rounded-[10px] px-4 py-3.5"
+        style={{
+          background: isAlert ? `${col}0d` : "var(--bg-card)",
+          border: `1px solid ${col}${isAlert ? "66" : "33"}`,
+          boxShadow: isAlert ? `0 0 14px ${col}22` : "none",
+        }}
+      >
         <ScoreBar pct={zone.urban_score} color={col} />
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{zone.zone_name}</div>
-          {isAlert && <div style={{ width: 6, height: 6, borderRadius: "50%", background: col, boxShadow: `0 0 5px ${col}`, flexShrink: 0 }} />}
+        <div className="flex items-start justify-between">
+          <div className="mb-1 min-w-0 truncate text-[11px] text-text-secondary">{zone.zone_name}</div>
+          {isAlert && <div className="size-1.5 shrink-0 rounded-full" style={{ background: col, boxShadow: `0 0 5px ${col}` }} />}
         </div>
 
-        <div style={{ fontSize: 32, fontWeight: 800, color: col, lineHeight: 1 }}>{zone.urban_score}</div>
-        <div style={{ fontSize: 10, color: col, marginTop: 3, fontWeight: 700, letterSpacing: "0.05em" }}>{zone.level}</div>
+        <div className="text-[32px] font-extrabold leading-none" style={{ color: col }}>{zone.urban_score}</div>
+        <div className="mt-0.5 text-[10px] font-bold tracking-wide" style={{ color: col }}>{zone.level}</div>
 
-        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 2 }}>
+        <div className="mt-2.5 flex flex-col gap-0.5">
           {(zone.top_causes ?? []).length > 0
             ? zone.top_causes.slice(0, 2).map((c, i) => (
-                <div key={i} style={{ fontSize: 9, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>▸ {c}</div>
+                <div key={i} className="truncate text-[9px] text-text-secondary">▸ {c}</div>
               ))
-            : <div style={{ fontSize: 9, color: "var(--text-secondary)", fontStyle: "italic" }}>Conditions normales</div>
+            : <div className="text-[9px] italic text-text-secondary">Conditions normales</div>
           }
         </div>
       </div>

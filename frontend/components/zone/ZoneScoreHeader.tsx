@@ -15,24 +15,24 @@ export default function ZoneScoreHeader({ zone, simDate }: Props) {
   const displayScore = useCountUp(zone.urban_score, 700);
 
   return (
-    <div style={{ background: "var(--bg-card)", borderRadius: 12, padding: 24, border: `1px solid ${col}33`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
-      <div style={{ flex: 1, minWidth: 200 }}>
-        <div style={{ fontSize: 26, fontWeight: 800 }}>{zone.zone_name}</div>
+    <div className="flex flex-wrap items-start justify-between gap-4 rounded-xl bg-bg-card p-6" style={{ border: `1px solid ${col}33` }}>
+      <div className="min-w-[200px] flex-1">
+        <div className="text-[26px] font-extrabold">{zone.zone_name}</div>
         {!isSimMode && (
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+          <div className="mt-1 text-xs text-text-muted">
             φ = {zone.components.phi.toFixed(2)} · {new Date(zone.timestamp).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris" })}
           </div>
         )}
         {isSimMode && (
-          <div style={{ fontSize: 12, color: "#f97316", marginTop: 4 }}>
+          <div className="mt-1 text-xs text-[#f97316]">
             Simulation · {simDate} · φ = {zone.components.phi.toFixed(2)}
           </div>
         )}
-        <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 12, lineHeight: 1.7 }}>{zone.explanation}</div>
+        <div className="mt-3 text-[13px] leading-relaxed text-text-secondary">{zone.explanation}</div>
       </div>
-      <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
-        <div style={{ fontSize: 56, fontWeight: 900, color: col, lineHeight: 1 }}>{displayScore}</div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: col, marginTop: 4 }}>{zone.level}</div>
+      <div className="ml-4 shrink-0 text-right">
+        <div className="text-[56px] font-black leading-none" style={{ color: col }}>{displayScore}</div>
+        <div className="mt-1 text-[13px] font-bold" style={{ color: col }}>{zone.level}</div>
       </div>
     </div>
   );

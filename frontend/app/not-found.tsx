@@ -2,12 +2,12 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <div style={{ padding: 40, textAlign: "center" }}>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Page introuvable</h2>
-      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 16 }}>
-        La page demandée n'existe pas.
+    <div className="p-10 text-center">
+      <h2 className="mb-2 text-base font-bold">Page introuvable</h2>
+      <p className="mb-4 text-xs text-text-secondary">
+        La page demandée n&apos;existe pas.
       </p>
-      <Link href="/" style={{ color: "var(--accent-text)", fontSize: 12 }}>
+      <Link href="/" className="text-xs text-accent-text">
         ← Retour à l&apos;accueil
       </Link>
     </div>

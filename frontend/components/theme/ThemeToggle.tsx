@@ -19,21 +19,7 @@ export default function ThemeToggle() {
       onClick={next}
       aria-label={mounted ? LABELS[choice] : LABELS.system}
       title={mounted ? LABELS[choice] : LABELS.system}
-      style={{
-        fontSize: 14,
-        color: "var(--text-secondary)",
-        background: "var(--bg-control)",
-        border: "1px solid var(--border)",
-        borderRadius: 4,
-        padding: "4px 10px",
-        cursor: "pointer",
-        minHeight: 36,
-        minWidth: 36,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 4,
-      }}
+      className="flex min-h-9 min-w-9 cursor-pointer items-center justify-center gap-1 rounded border border-border bg-bg-control px-2.5 py-1 text-sm text-text-secondary"
     >
       <span aria-hidden="true">{mounted ? ICONS[choice] : ICONS.system}</span>
     </button>

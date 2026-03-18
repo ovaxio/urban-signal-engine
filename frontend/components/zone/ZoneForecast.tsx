@@ -15,23 +15,23 @@ function ForecastScore({ value }: { value: number }) {
 
 export default function ZoneForecast({ forecast }: Props) {
   return (
-    <div style={{ background: "var(--bg-card)", borderRadius: 12, padding: 20, border: "1px solid var(--border)" }}>
-      <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: "0.1em", marginBottom: 14, fontWeight: 600 }}>PRÉVISION</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))", gap: 10 }}>
-        <div style={{ textAlign: "center", padding: 14, background: "var(--bg-inner)", borderRadius: 8, border: `1px solid ${scoreColor(forecast.current_score)}44` }}>
-          <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5 }}>Maintenant</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(forecast.current_score) }}><ForecastScore value={forecast.current_score} /></div>
-          <div style={{ fontSize: 10, color: scoreColor(forecast.current_score), marginTop: 3 }}>{forecast.current_level}</div>
+    <div className="rounded-xl border border-border bg-bg-card p-5">
+      <div className="mb-3.5 text-[10px] font-semibold tracking-widest text-text-muted">PRÉVISION</div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(80px,1fr))] gap-2.5">
+        <div className="rounded-lg bg-bg-inner p-3.5 text-center" style={{ border: `1px solid ${scoreColor(forecast.current_score)}44` }}>
+          <div className="mb-1.5 text-[10px] text-text-muted">Maintenant</div>
+          <div className="text-[28px] font-bold" style={{ color: scoreColor(forecast.current_score) }}><ForecastScore value={forecast.current_score} /></div>
+          <div className="mt-0.5 text-[10px]" style={{ color: scoreColor(forecast.current_score) }}>{forecast.current_level}</div>
         </div>
         {forecast.forecast.map(f => (
-          <div key={f.horizon} style={{ textAlign: "center", padding: 14, background: "var(--bg-inner)", borderRadius: 8, border: `1px solid ${scoreColor(f.urban_score)}33` }}>
-            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5 }}>+{f.horizon}</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(f.urban_score), opacity: f.confidence === "low" ? 0.6 : 1 }}><ForecastScore value={f.urban_score} /></div>
-            <div style={{ fontSize: 10, color: scoreColor(f.urban_score), marginTop: 3 }}>{f.level}</div>
+          <div key={f.horizon} className="rounded-lg bg-bg-inner p-3.5 text-center" style={{ border: `1px solid ${scoreColor(f.urban_score)}33` }}>
+            <div className="mb-1.5 text-[10px] text-text-muted">+{f.horizon}</div>
+            <div className="text-[28px] font-bold" style={{ color: scoreColor(f.urban_score), opacity: f.confidence === "low" ? 0.6 : 1 }}><ForecastScore value={f.urban_score} /></div>
+            <div className="mt-0.5 text-[10px]" style={{ color: scoreColor(f.urban_score) }}>{f.level}</div>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 8 }}>{forecast.disclaimer}</div>
+      <div className="mt-2 text-[10px] text-text-muted">{forecast.disclaimer}</div>
     </div>
   );
 }

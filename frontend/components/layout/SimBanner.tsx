@@ -10,20 +10,20 @@ export default function SimBanner({ simDate, events, zoneId }: Props) {
   return (
     <>
       {events && events.length > 0 && (
-        <div style={{ background: "var(--bg-card)", borderBottom: "1px solid #f9731633", padding: "6px 24px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: 10, color: "var(--text-muted)" }}>ÉVÉNEMENTS ACTIFS :</span>
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#f9731633] bg-bg-card px-6 py-1.5">
+          <span className="text-[10px] text-text-muted">ÉVÉNEMENTS ACTIFS :</span>
           {events.map((e, i) => (
-            <span key={i} style={{ fontSize: 10, color: "#f97316", background: "#f9731611", border: "1px solid #f9731633", borderRadius: 4, padding: "1px 8px" }}>{e}</span>
+            <span key={i} className="rounded border border-[#f9731633] bg-[#f9731611] px-2 py-px text-[10px] text-[#f97316]">{e}</span>
           ))}
         </div>
       )}
 
       {zoneId && (
-        <div style={{ background: "var(--bg-card)", borderRadius: 12, padding: 20, border: "1px solid #f9731622", textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-            Simulation · l'historique et les prévisions ne sont pas disponibles en mode simulation.
+        <div className="rounded-xl border border-[#f9731622] bg-bg-card p-5 text-center">
+          <div className="text-[11px] text-text-muted">
+            Simulation · l&apos;historique et les prévisions ne sont pas disponibles en mode simulation.
           </div>
-          <Link href={`/zones/${zoneId}`} style={{ fontSize: 11, color: "var(--accent-text)", marginTop: 8, display: "inline-block" }}>
+          <Link href={`/zones/${zoneId}`} className="mt-2 inline-block text-[11px] text-accent-text">
             Voir les données live →
           </Link>
         </div>

@@ -29,34 +29,17 @@ function barColor(val: number | null): string {
 
 export default function ZoneTransportDetail({ detail }: Props) {
   return (
-    <div style={{
-      background: "var(--bg-card)",
-      borderRadius: 12,
-      padding: 20,
-      border: "1px solid var(--border)",
-    }}>
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 14,
-      }}>
-        <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: "0.1em", fontWeight: 600 }}>
+    <div className="rounded-xl border border-border bg-bg-card p-5">
+      <div className="mb-3.5 flex items-center justify-between">
+        <div className="text-[10px] font-semibold tracking-widest text-text-muted">
           DÉTAIL TRANSPORT TCL
         </div>
-        <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-          Score composite : <span style={{ fontWeight: 600, color: barColor(detail.score) }}>
+        <div className="text-[10px] text-text-muted">
+          Score composite : <span className="font-semibold" style={{ color: barColor(detail.score) }}>
             {(detail.score * 100).toFixed(0)}%
           </span>
           {detail.fallback && (
-            <span style={{
-              marginLeft: 6,
-              fontSize: 9,
-              padding: "1px 5px",
-              background: "#f9731622",
-              color: "#f97316",
-              borderRadius: 3,
-            }}>
+            <span className="ml-1.5 rounded-sm bg-[#f9731622] px-1.5 py-px text-[9px] text-[#f97316]">
               fallback
             </span>
           )}
@@ -66,26 +49,20 @@ export default function ZoneTransportDetail({ detail }: Props) {
       {SUBS.map(({ key, label, weight, desc }) => {
         const val = detail[key as keyof TransportDetail] as number | null;
         return (
-          <div key={key} style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, fontSize: 11 }}>
-              <span style={{ color: "var(--text-primary)" }}>
+          <div key={key} className="mb-3">
+            <div className="mb-0.5 flex justify-between text-[11px]">
+              <span className="text-text-primary">
                 {label}
-                <span style={{ color: "var(--text-muted)", fontSize: 10, marginLeft: 6 }}>({weight})</span>
+                <span className="ml-1.5 text-[10px] text-text-muted">({weight})</span>
               </span>
-              <span style={{ fontWeight: 600, color: barColor(val) }}>
+              <span className="font-semibold" style={{ color: barColor(val) }}>
                 {valLabel(val)}
               </span>
             </div>
-            <div style={{ height: 5, background: "var(--bg-control)", borderRadius: 3 }}>
-              <div style={{
-                height: "100%",
-                width: `${pctBar(val)}%`,
-                background: barColor(val),
-                borderRadius: 3,
-                transition: "width 0.4s ease-out",
-              }} />
+            <div className="h-[5px] rounded-sm bg-bg-control">
+              <div className="h-full rounded-sm transition-[width] duration-400 ease-out" style={{ width: `${pctBar(val)}%`, background: barColor(val) }} />
             </div>
-            <div style={{ fontSize: 9, color: "var(--text-muted)", marginTop: 2 }}>{desc}</div>
+            <div className="mt-0.5 text-[9px] text-text-muted">{desc}</div>
           </div>
         );
       })}
