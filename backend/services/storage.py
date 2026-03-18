@@ -109,6 +109,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
         conn.execute(CREATE_ALERTS_LOG)
         conn.execute(CREATE_VACANCES)
         conn.execute(CREATE_FORECAST_HISTORY)
+        conn.execute(CREATE_CONTACT)
         for idx_sql in CREATE_INDEXES:
             conn.execute(idx_sql)
         _migrate_raw_columns(conn)
@@ -639,6 +640,31 @@ def get_recent_alerts(limit: int = 50, db_path: Path = DB_PATH) -> list[dict[str
         conn.row_factory = sqlite3.Row
         rows = conn.execute(sql, (limit,)).fetchall()
     return [dict(r) for r in rows]
+
+
+# ─── Contact ──────────────────────────────────────────────────────────────────
+
+CREATE_CONTACT = """
+CREATE TABLE IF NOT EXISTS contact_submissions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom         TEXT NOT NULL,
+    email       TEXT NOT NULL,
+    organisation TEXT NOT NULL,
+    message     TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+"""
+
+
+def save_contact(nom: str, email: str, organisation: str, message: str, db_path: Path = DB_PATH) -> None:
+    """Persiste une soumission de formulaire de contact."""
+    now = datetime.now(timezone.utc).isoformat()
+    with _get_conn(db_path) as conn:
+        conn.execute(
+            "INSERT INTO contact_submissions (nom, email, organisation, message, created_at) VALUES (?, ?, ?, ?, ?)",
+            (nom, email, organisation, message, now),
+        )
+    logger.info("Contact submission from %s (%s)", email, organisation)
 
 
 # ─── Forecast Accuracy Tracking ───────────────────────────────────────────────

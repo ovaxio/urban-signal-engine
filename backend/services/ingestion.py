@@ -45,6 +45,15 @@ def _nearest_zone(lat: float, lon: float) -> Optional[str]:
 # Météo — Open-Meteo
 # ---------------------------------------------------------------------------
 
+def _weather_score_from_values(precip: float, wind: float, wmo: int) -> float:
+    """Score météo synthétique [0, 3.0] depuis les valeurs Open-Meteo."""
+    score = 0.0
+    score += min(precip / 5.0, 1.5)
+    score += 0.5 if wind > 50 else 0.0
+    score += 1.5 if wmo >= 95 else (0.8 if wmo >= 61 else 0.0)
+    return min(score, 3.0)
+
+
 async def fetch_weather() -> Dict[str, float]:
     async with httpx.AsyncClient() as client:
         data = await safe_get(client, APIS.WEATHER_URL)
@@ -54,11 +63,7 @@ async def fetch_weather() -> Dict[str, float]:
     precip = float(cur.get("precipitation", 0))
     wind   = float(cur.get("wind_speed_10m", 0))
     wmo    = int(cur.get("weather_code", 0))
-    score  = 0.0
-    score += min(precip / 5.0, 1.5)
-    score += 0.5 if wind > 50 else 0.0
-    score += 1.5 if wmo >= 95 else (0.8 if wmo >= 61 else 0.0)
-    score = min(score, 3.0)
+    score  = _weather_score_from_values(precip, wind, wmo)
     return {z: round(score, 3) for z in ZONE_CENTROIDS}
 
 # ---------------------------------------------------------------------------
@@ -67,15 +72,6 @@ async def fetch_weather() -> Dict[str, float]:
 
 _weather_forecast_cache: dict = {"data": None, "ts": None}
 _WEATHER_FORECAST_TTL = 1800  # 30 min — les prévisions horaires ne changent pas vite
-
-
-def _weather_score_from_values(precip: float, wind: float, wmo: int) -> float:
-    """Même logique que fetch_weather() — score météo [0, 3.0]."""
-    score = 0.0
-    score += min(precip / 5.0, 1.5)
-    score += 0.5 if wind > 50 else 0.0
-    score += 1.5 if wmo >= 95 else (0.8 if wmo >= 61 else 0.0)
-    return min(score, 3.0)
 
 
 async def fetch_weather_forecast() -> Dict[str, float]:
