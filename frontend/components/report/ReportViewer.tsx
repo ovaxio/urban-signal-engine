@@ -3,9 +3,8 @@
 import { useState } from "react";
 import type { CalendarEvent, ImpactReport } from "@/domain/types";
 import { scoreColor } from "@/domain/scoring";
+import { fetchEventImpact, fetchImpactReport } from "@/lib/api";
 import ImpactReportView from "./ImpactReportView";
-
-const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 type Props = { events: CalendarEvent[] };
 
@@ -23,15 +22,7 @@ export default function ReportViewer({ events }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch(
-        `${BASE}/reports/impact/event/${encodeURIComponent(name)}`,
-        { cache: "no-store" }
-      );
-      if (!r.ok) {
-        const body = await r.json().catch(() => null);
-        throw new Error(body?.detail ?? `Erreur ${r.status}`);
-      }
-      setReport(await r.json());
+      setReport(await fetchEventImpact(name));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
       setReport(null);
@@ -45,16 +36,10 @@ export default function ReportViewer({ events }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const q = new URLSearchParams({
+      setReport(await fetchImpactReport({
         start: `${start}T00:00:00+00:00`,
         end: `${end}T23:59:59+00:00`,
-      });
-      const r = await fetch(`${BASE}/reports/impact?${q}`, { cache: "no-store" });
-      if (!r.ok) {
-        const body = await r.json().catch(() => null);
-        throw new Error(body?.detail ?? `Erreur ${r.status}`);
-      }
-      setReport(await r.json());
+      }));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
       setReport(null);

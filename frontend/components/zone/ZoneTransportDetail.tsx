@@ -1,5 +1,3 @@
-"use client";
-
 import type { TransportDetail } from "@/domain/types";
 
 type Props = {

@@ -5,6 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
+import { fetchHistory } from "@/lib/api";
 import type { HistoryPoint } from "@/domain/types";
 
 type Props = {
@@ -34,10 +35,9 @@ export default function ZoneHistoryChart({ zoneId, limit = 48 }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE}/zones/${zoneId}/history?limit=${limit}`)
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    fetchHistory(zoneId, limit)
       .then(json => setData([...json.history].reverse()))
-      .catch(e => setError(e.message))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [zoneId, limit]);
 

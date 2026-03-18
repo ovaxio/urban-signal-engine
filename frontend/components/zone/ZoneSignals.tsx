@@ -1,6 +1,3 @@
-"use client";
-
-import { useState, useEffect } from "react";
 import { scoreColor } from "@/domain/scoring";
 import { SIGNAL_LABELS } from "@/domain/constants";
 
@@ -10,18 +7,12 @@ type Props = {
 };
 
 export default function ZoneSignals({ signals, weights }: Props) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    requestAnimationFrame(() => setMounted(true));
-  }, []);
-
   const sorted = Object.entries(signals).sort(([, a], [, b]) => Math.abs(b) - Math.abs(a));
 
   return (
     <div style={{ background: "var(--bg-card)", borderRadius: 12, padding: 20, border: "1px solid var(--border)" }}>
       <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: "0.1em", marginBottom: 14, fontWeight: 600 }}>SIGNAUX</div>
-      {sorted.map(([key, val], index) => {
+      {sorted.map(([key, val]) => {
         const v   = val as number;
         const pct = Math.min(100, Math.abs(v) / 3 * 100);
         const c   = scoreColor(Math.min(100, 30 + Math.abs(v) * 25));
@@ -37,11 +28,9 @@ export default function ZoneSignals({ signals, weights }: Props) {
             <div style={{ height: 5, background: "var(--bg-control)", borderRadius: 3 }}>
               <div style={{
                 height: "100%",
-                width: mounted ? `${pct}%` : "0%",
+                width: `${pct}%`,
                 background: c,
                 borderRadius: 3,
-                transition: "width 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
-                transitionDelay: `${index * 80}ms`,
               }} />
             </div>
           </div>

@@ -49,6 +49,12 @@ export async function fetchAlerts(limit = 20) {
   return r.json();
 }
 
+export async function fetchHistory(zoneId: string, limit = 48) {
+  const r = await fetch(`${BASE}/zones/${zoneId}/history?limit=${limit}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`/zones/${zoneId}/history ${r.status}`);
+  return r.json();
+}
+
 export async function fetchImpactReport(params: {
   start: string; end: string;
   baseline_start?: string; baseline_end?: string;

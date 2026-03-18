@@ -1,5 +1,3 @@
-"use client";
-
 import type { ImpactReport, ImpactZone, Alert } from "@/domain/types";
 import { scoreColor } from "@/domain/scoring";
 
