@@ -68,18 +68,18 @@ ZONE_TRANSPORT_MU = {
 }
 
 ZONE_INCIDENT_MU = {
-    "part-dieu":    0.90,
-    "presquile":    0.80,
-    "guillotiere":  0.75,
-    "perrache":     0.70,
-    "brotteaux":    0.60,
-    "villette":     0.65,
-    "gerland":      0.60,
-    "montchat":     0.50,
-    "fourviere":    0.45,
-    "vieux-lyon":   0.55,
-    "croix-rousse": 0.55,
-    "confluence":   0.55,
+    "part-dieu":    1.50,   # recalibré depuis données live (mars 2026)
+    "presquile":    1.70,
+    "guillotiere":  1.75,
+    "perrache":     0.75,
+    "brotteaux":    0.85,
+    "villette":     2.15,
+    "gerland":      2.55,
+    "montchat":     2.25,
+    "fourviere":    1.95,
+    "vieux-lyon":   1.20,
+    "croix-rousse": 2.00,
+    "confluence":   1.60,
 }
 
 ZONE_IDS = list(ZONE_NAMES.keys())

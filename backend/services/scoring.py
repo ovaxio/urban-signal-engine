@@ -117,7 +117,7 @@ BASELINE = {
     "weather":   {"mu": 0.3,  "sigma": 0.35},
     "event":     {"mu": 0.2,  "sigma": 0.3},     # non-stationnaire — exclu de la calibration auto
     "transport": {"mu": 0.50, "sigma": 0.28},
-    "incident":  {"mu": 0.8,  "sigma": 0.6},
+    "incident":  {"mu": 1.70, "sigma": 0.50},
 }
 
 # Baselines par zone — surchargent BASELINE si disponibles (calibrées depuis SQLite)

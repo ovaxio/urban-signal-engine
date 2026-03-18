@@ -293,7 +293,7 @@ def _is_event_active_at(props: dict, target: datetime.datetime) -> bool:
         return True  # échec parsing → inclure par défaut
 
 
-_INCIDENT_BASELINE_MU = 0.8   # mu du baseline incident (scoring.py)
+_INCIDENT_BASELINE_MU = 1.70  # mu du baseline incident (scoring.py)
 
 
 def _zone_score_from_weights(weights: list) -> float:
