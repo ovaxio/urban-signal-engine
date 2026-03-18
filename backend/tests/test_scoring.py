@@ -47,7 +47,7 @@ SIGNALS_CALM = {
 }
 SIGNALS_NEUTRAL = {
     "traffic": 1.05, "weather": 0.3, "event": 0.2,   # mu Criter calibré auto
-    "transport": 0.45, "incident": 0.8,
+    "transport": 0.50, "incident": 0.8,
 }
 SIGNALS_RUSH = {
     "traffic": 2.5, "weather": 0.2, "event": 0.0,

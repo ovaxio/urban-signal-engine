@@ -220,11 +220,35 @@ _CRITER_EVENT_WEIGHT_DEFAULT_NETWORK   = 1.0   # NetworkManagement sans sous-typ
 _CRITER_EVENT_WEIGHT_DEFAULT_ACTIVITY  = 0.3   # Activities sans sous-type
 
 
-def _criter_event_weight(props: dict) -> float:
+def _structural_decay(hour: float) -> float:
+    """Atténue les événements structurels (travaux, chantiers) en heures creuses.
+    Reflète le volume de trafic réellement impacté par les travaux."""
+    if 7.0 <= hour <= 9.5:
+        return 1.0       # rush matin
+    if 16.0 <= hour <= 19.0:
+        return 1.0       # rush soir
+    if 9.5 <= hour < 16.0:
+        return 0.7       # journée — flux continu mais dilué
+    if 19.0 < hour <= 21.0:
+        return 0.5       # soirée
+    if 21.0 < hour <= 23.0:
+        return 0.3       # soirée tardive
+    if 5.0 <= hour < 7.0:
+        return 0.5       # réveil progressif
+    return 0.10           # nuit (23h-5h)
+
+
+def _is_structural_event(props: dict) -> bool:
+    """True si l'événement est planifié/structurel (travaux, chantiers, fermetures)."""
+    return props.get("type", "") == "NetworkManagement"
+
+
+def _criter_event_weight(props: dict, decay: float = 1.0) -> float:
     evt_type = props.get("type", "")
     if evt_type == "NetworkManagement":
         sub = props.get("networkmanagementtype") or ""
-        return _CRITER_EVENT_WEIGHT.get(sub, _CRITER_EVENT_WEIGHT_DEFAULT_NETWORK)
+        base = _CRITER_EVENT_WEIGHT.get(sub, _CRITER_EVENT_WEIGHT_DEFAULT_NETWORK)
+        return base * decay
     if evt_type == "Activities":
         sub = props.get("disturbanceactivitytype") or ""
         return _CRITER_EVENT_WEIGHT.get(sub, _CRITER_EVENT_WEIGHT_DEFAULT_ACTIVITY)
@@ -318,6 +342,9 @@ async def fetch_incidents() -> tuple:
         h: {z: set() for z in ZONE_CENTROIDS} for h in _INCIDENT_HORIZONS
     }
 
+    from zoneinfo import ZoneInfo
+    _PARIS = ZoneInfo("Europe/Paris")
+
     for feat in features:
         props  = feat.get("properties", {})
         geom   = feat.get("geometry", {})
@@ -329,14 +356,17 @@ async def fetch_incidents() -> tuple:
         zone = _nearest_zone(lat, lon)
         if not zone:
             continue
-        weight    = _criter_event_weight(props)
-        criter_id = props.get("id")   # None si absent → chaque feature compte (rétrocompat)
+        structural = _is_structural_event(props)
+        criter_id  = props.get("id")
 
         for h in _INCIDENT_HORIZONS:
             target = now + datetime.timedelta(minutes=h)
             if _is_event_active_at(props, target):
                 if criter_id and criter_id in h_zone_seen[h][zone]:
                     continue   # même événement, segment déjà comptabilisé
+                local_hour = target.astimezone(_PARIS).hour + target.astimezone(_PARIS).minute / 60.0
+                decay = _structural_decay(local_hour) if structural else 1.0
+                weight = _criter_event_weight(props, decay=decay)
                 h_zone_weights[h][zone].append(weight)
                 if criter_id:
                     h_zone_seen[h][zone].add(criter_id)
@@ -353,14 +383,21 @@ async def fetch_incidents() -> tuple:
     }
     _TT_DECAY_DEFAULT = {0: 1.0, 30: 0.60, 60: 0.30, 120: 0.0}
 
+    _TT_STRUCTURAL_CATS = {7, 8, 9}  # Voie fermée, route fermée, travaux — structurels
+
     for tt in await _fetch_tomtom_incidents_cached():
         z       = tt["zone"]
         w       = tt["weight"]
-        decay_h = _TT_DECAY.get(tt.get("icon_cat", 0), _TT_DECAY_DEFAULT)
+        icon_cat = tt.get("icon_cat", 0)
+        is_struct = icon_cat in _TT_STRUCTURAL_CATS
+        decay_h = _TT_DECAY.get(icon_cat, _TT_DECAY_DEFAULT)
         for h in _INCIDENT_HORIZONS:
             factor = decay_h.get(h, 0.0)
             if factor > 0:
-                h_zone_weights[h][z].append(round(w * factor, 3))
+                target_h = now + datetime.timedelta(minutes=h)
+                local_hour = target_h.astimezone(_PARIS).hour + target_h.astimezone(_PARIS).minute / 60.0
+                sd = _structural_decay(local_hour) if is_struct else 1.0
+                h_zone_weights[h][z].append(round(w * factor * sd, 3))
 
     # Score courant (h=0)
     current: Dict[str, float] = {}
@@ -378,8 +415,8 @@ async def fetch_incidents() -> tuple:
     }
 
     # Détails lisibles des événements actifs par zone
-    from zoneinfo import ZoneInfo
-    PARIS_TZ = ZoneInfo("Europe/Paris")
+    PARIS_TZ = _PARIS
+    now_local_hour = now.astimezone(_PARIS).hour + now.astimezone(_PARIS).minute / 60.0
     events_by_zone: Dict[str, list] = {z: [] for z in ZONE_CENTROIDS}
 
     for feat in features:
@@ -431,7 +468,10 @@ async def fetch_incidents() -> tuple:
             "direction": direction_lbl,
             "end":       end_fmt,
             "ends_soon": ends_soon,
-            "weight":    _criter_event_weight(props),
+            "weight":    _criter_event_weight(
+                props,
+                decay=_structural_decay(now_local_hour) if _is_structural_event(props) else 1.0,
+            ),
         })
 
     # Ajouter les incidents TomTom dans events_by_zone (affichage frontend)

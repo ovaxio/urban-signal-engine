@@ -57,6 +57,26 @@ async def _get_scores(force_refresh: bool = False) -> List[dict]:
             evaluate_forecasts(scores)
             flag_incident_surprises(incident_events)
 
+            # Sauvegarder les forecasts pour TOUTES les zones (accuracy tracking)
+            if ENABLE_HISTORY:
+                zone_map = {z["zone_id"]: z for z in scores}
+                for z in scores:
+                    zid = z["zone_id"]
+                    trend = _compute_trend(zid, z["urban_score"])
+                    fc = compute_forecast(
+                        z["urban_score"],
+                        z["alert"],
+                        z["components"]["spread"],
+                        dt=now,
+                        trend=trend,
+                        signals=z.get("raw_signals"),
+                        incident_schedule=incident_schedule.get(zid),
+                        bl=_effective_baseline(zid),
+                        zone_id=zid,
+                        weather_forecast=weather_fc,
+                    )
+                    save_forecast_history(zid, fc, z["urban_score"])
+
             # Détection d'alertes sur franchissement de seuil
             new_alerts = check_alerts(_cache["prev_scores"], scores)
             if new_alerts:
