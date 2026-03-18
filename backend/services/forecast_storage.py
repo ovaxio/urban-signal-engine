@@ -1,0 +1,243 @@
+"""
+Urban Signal Engine — Forecast Accuracy Storage
+=================================================
+Persistence et évaluation des prévisions : save, evaluate, flag surprises, accuracy stats.
+"""
+
+import sqlite3
+import logging
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from services.storage import _get_conn, DB_PATH
+
+logger = logging.getLogger(__name__)
+
+
+# ─── Throttle ─────────────────────────────────────────────────────────────────
+
+FORECAST_SAVE_INTERVAL = 300  # 5 min
+_last_forecast_save: Optional[datetime] = None
+
+
+def _horizon_to_minutes(horizon: str) -> Optional[int]:
+    """Convertit '30min', '2h', '24h' en minutes."""
+    if horizon.endswith("min"):
+        try:
+            return int(horizon[:-3])
+        except ValueError:
+            return None
+    elif horizon.endswith("h"):
+        try:
+            return int(horizon[:-1]) * 60
+        except ValueError:
+            return None
+    return None
+
+
+# ─── Save ─────────────────────────────────────────────────────────────────────
+
+def save_forecast_history(
+    zone_id: str,
+    forecast: List[Dict[str, Any]],
+    current_score: int,
+    db_path: Path = DB_PATH,
+) -> int:
+    """
+    Persiste les prévisions d'une zone pour évaluation ultérieure.
+    Throttlé à FORECAST_SAVE_INTERVAL pour éviter le bloat.
+    """
+    global _last_forecast_save
+    now = datetime.now(timezone.utc)
+    if _last_forecast_save and (now - _last_forecast_save).total_seconds() < FORECAST_SAVE_INTERVAL:
+        return 0
+
+    ts_now = now.isoformat(timespec="seconds")
+    rows = []
+    for f in forecast:
+        horizon = f.get("horizon", "")
+        predicted = f.get("urban_score", 0)
+        minutes = _horizon_to_minutes(horizon)
+        if minutes is None:
+            continue
+        target_dt = now + timedelta(minutes=minutes)
+        rows.append({
+            "ts_forecast": ts_now,
+            "zone_id": zone_id,
+            "horizon": horizon,
+            "predicted_score": predicted,
+            "target_ts": target_dt.isoformat(timespec="seconds"),
+        })
+
+    if not rows:
+        return 0
+
+    sql = """
+        INSERT INTO forecast_history (ts_forecast, zone_id, horizon, predicted_score, target_ts)
+        VALUES (:ts_forecast, :zone_id, :horizon, :predicted_score, :target_ts)
+    """
+    with _get_conn(db_path) as conn:
+        conn.executemany(sql, rows)
+
+    _last_forecast_save = now
+    logger.debug("forecast_history : %d prévision(s) sauvegardée(s) pour %s.", len(rows), zone_id)
+    return len(rows)
+
+
+# ─── Evaluate ─────────────────────────────────────────────────────────────────
+
+def evaluate_forecasts(
+    scores: List[Dict[str, Any]],
+    tolerance_minutes: int = 5,
+    db_path: Path = DB_PATH,
+) -> int:
+    """
+    Compare les forecasts passés avec les scores actuels.
+    Pour chaque forecast dont target_ts est dans [now - tolerance, now + tolerance]
+    et qui n'a pas encore été évalué, on enregistre le score réel et le delta.
+    """
+    now = datetime.now(timezone.utc)
+    window_start = (now - timedelta(minutes=tolerance_minutes)).isoformat(timespec="seconds")
+    window_end = (now + timedelta(minutes=tolerance_minutes)).isoformat(timespec="seconds")
+
+    score_map = {z["zone_id"]: z["urban_score"] for z in scores}
+
+    sql_select = """
+        SELECT id, zone_id, predicted_score
+        FROM forecast_history
+        WHERE target_ts >= ? AND target_ts <= ?
+          AND actual_score IS NULL
+    """
+    sql_update = """
+        UPDATE forecast_history
+        SET actual_score = ?, delta = ?, evaluated_at = ?
+        WHERE id = ?
+    """
+
+    evaluated = 0
+    eval_ts = now.isoformat(timespec="seconds")
+
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        pending = conn.execute(sql_select, (window_start, window_end)).fetchall()
+
+        for row in pending:
+            actual = score_map.get(row["zone_id"])
+            if actual is None:
+                continue
+            delta = actual - row["predicted_score"]
+            conn.execute(sql_update, (actual, delta, eval_ts, row["id"]))
+            evaluated += 1
+
+    if evaluated:
+        logger.info("forecast_history : %d prévision(s) évaluée(s).", evaluated)
+    return evaluated
+
+
+# ─── Flag Incident Surprises ──────────────────────────────────────────────────
+
+def flag_incident_surprises(
+    incident_events: Dict[str, List[Dict]],
+    db_path: Path = DB_PATH,
+) -> int:
+    """
+    Marque les forecasts évalués comme 'incident_surprise' si des incidents
+    non prévus sont apparus entre ts_forecast et target_ts pour la zone.
+    """
+    if not incident_events:
+        return 0
+
+    sql_select = """
+        SELECT id, zone_id, ts_forecast
+        FROM forecast_history
+        WHERE actual_score IS NOT NULL
+          AND incident_surprise = 0
+          AND ABS(delta) > 10
+    """
+    sql_update = "UPDATE forecast_history SET incident_surprise = 1 WHERE id = ?"
+
+    flagged = 0
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql_select).fetchall()
+
+        for row in rows:
+            zone_events = incident_events.get(row["zone_id"], [])
+            ts_fc = row["ts_forecast"]
+            for ev in zone_events:
+                start = ev.get("starttime", "")
+                if start and start > ts_fc:
+                    conn.execute(sql_update, (row["id"],))
+                    flagged += 1
+                    break
+
+    if flagged:
+        logger.info("forecast_history : %d prévision(s) marquée(s) incident_surprise.", flagged)
+    return flagged
+
+
+# ─── Accuracy Stats ───────────────────────────────────────────────────────────
+
+def get_forecast_accuracy(
+    zone_id: Optional[str] = None,
+    horizon: Optional[str] = None,
+    limit: int = 200,
+    db_path: Path = DB_PATH,
+) -> Dict[str, Any]:
+    """
+    Stats de précision des forecasts évalués :
+    MAE global et par horizon, taux d'incident_surprise, dernières évaluations.
+    """
+    where_clauses = ["actual_score IS NOT NULL"]
+    params: list = []
+    if zone_id:
+        where_clauses.append("zone_id = ?")
+        params.append(zone_id)
+    if horizon:
+        where_clauses.append("horizon = ?")
+        params.append(horizon)
+
+    where = " AND ".join(where_clauses)
+
+    sql_stats = f"""
+        SELECT
+            horizon,
+            COUNT(*)                                            AS n,
+            ROUND(AVG(ABS(delta)), 1)                           AS mae,
+            ROUND(AVG(CASE WHEN incident_surprise = 0 THEN ABS(delta) END), 1) AS mae_clean,
+            SUM(CASE WHEN incident_surprise = 1 THEN 1 ELSE 0 END) AS n_surprise,
+            ROUND(AVG(delta), 1)                                AS bias,
+            MIN(delta)                                          AS min_delta,
+            MAX(delta)                                          AS max_delta
+        FROM forecast_history
+        WHERE {where}
+        GROUP BY horizon
+        ORDER BY horizon
+    """
+
+    sql_recent = f"""
+        SELECT ts_forecast, zone_id, horizon, predicted_score,
+               actual_score, delta, incident_surprise, evaluated_at
+        FROM forecast_history
+        WHERE {where}
+        ORDER BY evaluated_at DESC
+        LIMIT ?
+    """
+
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        stats = [dict(r) for r in conn.execute(sql_stats, params).fetchall()]
+        recent = [dict(r) for r in conn.execute(sql_recent, params + [limit]).fetchall()]
+
+    total_n = sum(s["n"] for s in stats)
+    total_mae = round(sum(s["mae"] * s["n"] for s in stats) / total_n, 1) if total_n else None
+    total_surprise = sum(s["n_surprise"] for s in stats)
+
+    return {
+        "total_evaluated": total_n,
+        "mae_global": total_mae,
+        "incident_surprises": total_surprise,
+        "by_horizon": stats,
+        "recent": recent[:50],
+    }

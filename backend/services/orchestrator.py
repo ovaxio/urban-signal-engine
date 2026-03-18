@@ -16,9 +16,9 @@ from services.ingestion import fetch_all_signals
 from services.scoring import (
     score_all_zones, compute_forecast, _effective_baseline,
 )
-from services.storage import (
-    save_scores_history, save_forecast_history,
-    evaluate_forecasts, flag_incident_surprises,
+from services.storage import save_scores_history
+from services.forecast_storage import (
+    save_forecast_history, evaluate_forecasts, flag_incident_surprises,
 )
 from services.alerts import check_alerts, dispatch_alerts
 

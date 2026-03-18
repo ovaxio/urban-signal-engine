@@ -8,7 +8,11 @@ import logging
 from typing import Dict, Optional
 
 import httpx
-from config import APIS, ENABLE_HISTORY, CRITER_ETAT_TO_RATIO, ZONE_CENTROIDS
+from config import (
+    APIS, ENABLE_HISTORY, CRITER_ETAT_TO_RATIO, ZONE_CENTROIDS,
+    WEATHER_PRECIP_DIVISOR, WEATHER_WIND_THRESHOLD,
+    WEATHER_WMO_SEVERE, WEATHER_WMO_MODERATE, WEATHER_SCORE_MAX,
+)
 from services.events import fetch_event_signals
 from services.smoothing import smooth_signals
 
@@ -32,6 +36,10 @@ async def safe_get(client: httpx.AsyncClient, url: str, params: dict = None) -> 
 # 1° de longitude pèse autant que 1° de latitude en distance réelle.
 _COS_LAT_LYON = math.cos(math.radians(45.76))
 
+# Rayon max d'assignation : 2 km ≈ 0.018° lat → d² = 0.000324
+# Au-delà, le point est hors périmètre urbain (filtre Bron, A43, etc.)
+_MAX_ZONE_D2 = (2.0 / 111.1) ** 2
+
 
 def _nearest_zone(lat: float, lon: float) -> Optional[str]:
     best, best_d = None, float("inf")
@@ -39,6 +47,8 @@ def _nearest_zone(lat: float, lon: float) -> Optional[str]:
         d = (lat - zlat) ** 2 + ((lon - zlon) * _COS_LAT_LYON) ** 2
         if d < best_d:
             best_d, best = d, zone
+    if best_d > _MAX_ZONE_D2:
+        return None
     return best
 
 # ---------------------------------------------------------------------------
@@ -46,12 +56,12 @@ def _nearest_zone(lat: float, lon: float) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def _weather_score_from_values(precip: float, wind: float, wmo: int) -> float:
-    """Score météo synthétique [0, 3.0] depuis les valeurs Open-Meteo."""
+    """Score météo synthétique [0, WEATHER_SCORE_MAX] depuis les valeurs Open-Meteo."""
     score = 0.0
-    score += min(precip / 5.0, 1.5)
-    score += 0.5 if wind > 50 else 0.0
-    score += 1.5 if wmo >= 95 else (0.8 if wmo >= 61 else 0.0)
-    return min(score, 3.0)
+    score += min(precip / WEATHER_PRECIP_DIVISOR, 1.5)
+    score += 0.5 if wind > WEATHER_WIND_THRESHOLD else 0.0
+    score += 1.5 if wmo >= WEATHER_WMO_SEVERE else (0.8 if wmo >= WEATHER_WMO_MODERATE else 0.0)
+    return min(score, WEATHER_SCORE_MAX)
 
 
 async def fetch_weather() -> Dict[str, float]:
@@ -283,12 +293,57 @@ def _zone_score_from_weights(weights: list) -> float:
     return round(min(avg * density, 3.0), 3)
 
 
+def _build_event_display(props: dict, now, paris_tz) -> dict:
+    """Construit l'objet d'affichage frontend pour un événement Criter."""
+    evt_type = (
+        props.get("networkmanagementtype")
+        or props.get("disturbanceactivitytype")
+        or props.get("type", "")
+    )
+    comment = props.get("publiccomment") or ""
+    parts   = [p.strip() for p in comment.split("|")]
+    label   = parts[0][:70] if parts else ""
+    detail  = parts[1][:80] if len(parts) > 1 else ""
+
+    direction_lbl = {
+        "bothWays": "", "inbound": "→ centre", "outbound": "→ périphérie",
+    }.get(props.get("direction", ""), "")
+
+    end_s     = props.get("endtime", "")
+    ends_soon = False
+    end_fmt   = ""
+    try:
+        end_dt = datetime.datetime.fromisoformat(end_s)
+        if end_dt.tzinfo is None:
+            end_dt = end_dt.replace(tzinfo=paris_tz)
+        end_fmt   = end_dt.astimezone(paris_tz).strftime("%-d %b %H:%M")
+        ends_soon = now <= end_dt <= now + datetime.timedelta(hours=2)
+    except (ValueError, TypeError):
+        pass
+
+    now_local_hour = now.astimezone(paris_tz).hour + now.astimezone(paris_tz).minute / 60.0
+    return {
+        "type":      evt_type,
+        "label":     label,
+        "detail":    detail,
+        "direction": direction_lbl,
+        "end":       end_fmt,
+        "ends_soon": ends_soon,
+        "weight":    _criter_event_weight(
+            props,
+            decay=_structural_decay(now_local_hour) if _is_structural_event(props) else 1.0,
+        ),
+    }
+
+
 async def fetch_incidents() -> tuple:
     """
     Récupère les événements perturbateurs actifs depuis Criter/Grand Lyon WFS.
+    Single pass : accumule scores par horizon ET détails d'affichage simultanément.
     Retourne :
         current  : Dict[str, float]               — score incident par zone maintenant
         schedule : Dict[str, Dict[int, float]]    — score par zone à t+30/60/120 min
+        events   : Dict[str, List[dict]]           — détails événements actifs par zone
     """
     neutral_c  = {z: 0.0 for z in ZONE_CENTROIDS}
     neutral_s  = {z: {h: 0.0 for h in [30, 60, 120]} for z in ZONE_CENTROIDS}
@@ -314,19 +369,17 @@ async def fetch_incidents() -> tuple:
 
     now = datetime.datetime.now(datetime.timezone.utc)
 
-    # Accumuler les poids par horizon × zone
-    # Déduplication par ID Criter : un même événement peut être encodé comme
-    # plusieurs features (segments de route) — on ne le compte qu'une fois par zone.
+    from zoneinfo import ZoneInfo
+    _PARIS = ZoneInfo("Europe/Paris")
+
+    # Accumuler scores ET display en un seul pass
     h_zone_weights: Dict[int, Dict[str, list]] = {
         h: {z: [] for z in ZONE_CENTROIDS} for h in _INCIDENT_HORIZONS
     }
-    # (horizon, zone) → set d'IDs Criter déjà comptés
     h_zone_seen: Dict[int, Dict[str, set]] = {
         h: {z: set() for z in ZONE_CENTROIDS} for h in _INCIDENT_HORIZONS
     }
-
-    from zoneinfo import ZoneInfo
-    _PARIS = ZoneInfo("Europe/Paris")
+    events_by_zone: Dict[str, list] = {z: [] for z in ZONE_CENTROIDS}
 
     for feat in features:
         props  = feat.get("properties", {})
@@ -342,11 +395,12 @@ async def fetch_incidents() -> tuple:
         structural = _is_structural_event(props)
         criter_id  = props.get("id")
 
+        # Scores par horizon
         for h in _INCIDENT_HORIZONS:
             target = now + datetime.timedelta(minutes=h)
             if _is_event_active_at(props, target):
                 if criter_id and criter_id in h_zone_seen[h][zone]:
-                    continue   # même événement, segment déjà comptabilisé
+                    continue
                 local_hour = target.astimezone(_PARIS).hour + target.astimezone(_PARIS).minute / 60.0
                 decay = _structural_decay(local_hour) if structural else 1.0
                 weight = _criter_event_weight(props, decay=decay)
@@ -354,8 +408,11 @@ async def fetch_incidents() -> tuple:
                 if criter_id:
                     h_zone_seen[h][zone].add(criter_id)
 
-    # Merge TomTom incidents avec decay progressif par type
-    # iconCategory → {horizon_min: decay_factor}
+        # Display (h=0 uniquement)
+        if _is_event_active_at(props, now):
+            events_by_zone[zone].append(_build_event_display(props, now, _PARIS))
+
+    # Merge TomTom incidents
     _TT_DECAY: Dict[int, Dict[int, float]] = {
         1:  {0: 1.0, 30: 0.50, 60: 0.20, 120: 0.0},   # Accident
         6:  {0: 1.0, 30: 0.70, 60: 0.40, 120: 0.0},   # Bouchon
@@ -365,15 +422,14 @@ async def fetch_incidents() -> tuple:
         14: {0: 1.0, 30: 0.50, 60: 0.10, 120: 0.0},   # Véhicule en panne
     }
     _TT_DECAY_DEFAULT = {0: 1.0, 30: 0.60, 60: 0.30, 120: 0.0}
-
-    _TT_STRUCTURAL_CATS = {7, 8, 9}  # Voie fermée, route fermée, travaux — structurels
+    _TT_STRUCTURAL_CATS = {7, 8, 9}
 
     for tt in await _fetch_tomtom_incidents_cached():
-        z       = tt["zone"]
-        w       = tt["weight"]
+        z        = tt["zone"]
+        w        = tt["weight"]
         icon_cat = tt.get("icon_cat", 0)
         is_struct = icon_cat in _TT_STRUCTURAL_CATS
-        decay_h = _TT_DECAY.get(icon_cat, _TT_DECAY_DEFAULT)
+        decay_h  = _TT_DECAY.get(icon_cat, _TT_DECAY_DEFAULT)
         for h in _INCIDENT_HORIZONS:
             factor = decay_h.get(h, 0.0)
             if factor > 0:
@@ -382,84 +438,8 @@ async def fetch_incidents() -> tuple:
                 sd = _structural_decay(local_hour) if is_struct else 1.0
                 h_zone_weights[h][z].append(round(w * factor * sd, 3))
 
-    # Score courant (h=0)
-    current: Dict[str, float] = {}
-    for z in ZONE_CENTROIDS:
-        current[z] = _zone_score_from_weights(h_zone_weights[0][z])
-        log.info(
-            f"[criter-incidents] zone={z} "
-            f"count={len(h_zone_weights[0][z])} score={current[z]}"
-        )
-
-    # Schedule (tous horizons sauf h=0)
-    schedule: Dict[str, Dict[int, float]] = {
-        z: {h: _zone_score_from_weights(h_zone_weights[h][z]) for h in _INCIDENT_HORIZONS if h > 0}
-        for z in ZONE_CENTROIDS
-    }
-
-    # Détails lisibles des événements actifs par zone
-    PARIS_TZ = _PARIS
-    now_local_hour = now.astimezone(_PARIS).hour + now.astimezone(_PARIS).minute / 60.0
-    events_by_zone: Dict[str, list] = {z: [] for z in ZONE_CENTROIDS}
-
-    for feat in features:
-        props  = feat.get("properties", {})
-        geom   = feat.get("geometry", {})
-        coords = geom.get("coordinates", [])
-        point  = _multipoint_centroid(coords)
-        if not point:
-            continue
-        lat, lon = point
-        zone = _nearest_zone(lat, lon)
-        if not zone or not _is_event_active_at(props, now):
-            continue
-
-        evt_type = (
-            props.get("networkmanagementtype")
-            or props.get("disturbanceactivitytype")
-            or props.get("type", "")
-        )
-        comment  = props.get("publiccomment") or ""
-        parts    = [p.strip() for p in comment.split("|")]
-        label    = parts[0][:70] if parts else ""
-        detail   = parts[1][:80] if len(parts) > 1 else ""
-
-        # Direction de circulation
-        direction_raw = props.get("direction", "")
-        direction_lbl = {
-            "bothWays": "",
-            "inbound":  "→ centre",
-            "outbound": "→ périphérie",
-        }.get(direction_raw, "")
-
-        end_s    = props.get("endtime", "")
-        ends_soon = False
-        end_fmt  = ""
-        try:
-            end_dt = datetime.datetime.fromisoformat(end_s)
-            if end_dt.tzinfo is None:
-                end_dt = end_dt.replace(tzinfo=PARIS_TZ)
-            end_fmt   = end_dt.astimezone(PARIS_TZ).strftime("%-d %b %H:%M")
-            ends_soon = now <= end_dt <= now + datetime.timedelta(hours=2)
-        except (ValueError, TypeError):
-            pass
-
-        events_by_zone[zone].append({
-            "type":      evt_type,
-            "label":     label,
-            "detail":    detail,
-            "direction": direction_lbl,
-            "end":       end_fmt,
-            "ends_soon": ends_soon,
-            "weight":    _criter_event_weight(
-                props,
-                decay=_structural_decay(now_local_hour) if _is_structural_event(props) else 1.0,
-            ),
-        })
-
-    # Ajouter les incidents TomTom dans events_by_zone (affichage frontend)
-    for tt in _tomtom_cache.get("data") or []:
-        events_by_zone[tt["zone"]].append({
+        # TomTom display
+        events_by_zone[z].append({
             "type":      tt["evt_type"],
             "label":     tt["label"],
             "detail":    tt.get("detail", ""),
@@ -470,6 +450,17 @@ async def fetch_incidents() -> tuple:
             "weight":    tt["weight"],
             "source":    "tomtom",
         })
+
+    # Scores
+    current: Dict[str, float] = {}
+    for z in ZONE_CENTROIDS:
+        current[z] = _zone_score_from_weights(h_zone_weights[0][z])
+        log.info(f"[criter-incidents] zone={z} count={len(h_zone_weights[0][z])} score={current[z]}")
+
+    schedule: Dict[str, Dict[int, float]] = {
+        z: {h: _zone_score_from_weights(h_zone_weights[h][z]) for h in _INCIDENT_HORIZONS if h > 0}
+        for z in ZONE_CENTROIDS
+    }
 
     # Dédupliquer par (type, label) pour éviter les doublons de segments
     for z in ZONE_CENTROIDS:

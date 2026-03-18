@@ -64,6 +64,15 @@ FORECAST_HORIZONS_EXTENDED: List[int] = [360, 720, 1440]  # 6h, 12h, 24h
 CACHE_TTL_SECONDS: int = 60
 ENABLE_HISTORY: bool = os.getenv("ENABLE_HISTORY", "true").lower() == "true"
 
+# ── Seuils météo Open-Meteo ──────────────────────────────────────────────────
+# Utilisés par ingestion._weather_score_from_values() pour convertir les
+# données brutes Open-Meteo en score météo synthétique [0, 3.0].
+WEATHER_PRECIP_DIVISOR: float = 5.0    # mm → score : score += min(precip / divisor, 1.5)
+WEATHER_WIND_THRESHOLD: float = 50.0   # km/h — au-delà → +0.5
+WEATHER_WMO_SEVERE: int = 95           # code WMO ≥ 95 (orage violent) → +1.5
+WEATHER_WMO_MODERATE: int = 61         # code WMO ≥ 61 (pluie modérée) → +0.8
+WEATHER_SCORE_MAX: float = 3.0         # borne haute du score météo
+
 # Mapping état Criter → ratio synthétique de congestion
 # V=fluide, O=dense, R=chargé, N=coupée, G/*/inconnu=ignoré
 CRITER_ETAT_TO_RATIO: Dict[str, float] = {

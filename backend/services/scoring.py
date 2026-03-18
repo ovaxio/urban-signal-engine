@@ -192,101 +192,109 @@ def normalize(x: float, signal: str, bl: Dict[str, Dict[str, float]] = None) -> 
     return max(-Z_CAP, min(Z_CAP, z))
 
 
-def _ramp(x: float, x0: float, x1: float, v0: float, v1: float) -> float:
-    """Interpolation linéaire entre v0 et v1 sur [x0, x1]."""
-    if x <= x0: return v0
-    if x >= x1: return v1
-    return v0 + (v1 - v0) * (x - x0) / (x1 - x0)
+def _phi_from_breakpoints(breakpoints: List[tuple], t: float) -> float:
+    """Interpole linéairement φ depuis une liste de (heure, valeur) breakpoints."""
+    if t <= breakpoints[0][0]:
+        return breakpoints[0][1]
+    for i in range(1, len(breakpoints)):
+        t0, v0 = breakpoints[i - 1]
+        t1, v1 = breakpoints[i]
+        if t < t1:
+            return v0 + (v1 - v0) * (t - t0) / (t1 - t0)
+    return breakpoints[-1][1]
 
 
-def _phi_semaine(t: float) -> float:
-    """Profil semaine standard (lun, mar, jeu, ven hors vacances).
-    Calibré sur données réelles Lyon (Criter, CEREMA, EMD 2015).
-    Congestion: nuit ~5%, off-peak ~30%, rush matin ~80%, rush soir ~90%.
-    Le rush soir est plus intense que le matin à Lyon."""
-    if t < 5.0:  return 0.50                               # nuit (~5%)
-    if t < 6.5:  return _ramp(t, 5.0,  6.5,  0.50, 1.0)  # réveil progressif
-    if t < 7.0:  return _ramp(t, 6.5,  7.0,  1.0,  1.55) # montée rush matin
-    if t < 9.5:  return _ramp(t, 7.0,  9.5,  1.55, 1.60) # rush matin (pic 8h-9h)
-    if t < 10.5: return _ramp(t, 9.5,  10.5, 1.60, 1.10) # fin rush matin
-    if t < 11.5: return 1.10                               # creux matinée (~30%)
-    if t < 12.0: return _ramp(t, 11.5, 12.0, 1.10, 1.25) # montée midi (écoles 11h30)
-    if t < 13.5: return 1.25                               # mini-pic déjeuner (~40%)
-    if t < 14.5: return _ramp(t, 13.5, 14.5, 1.25, 1.05) # retour école/bureau 13h30
-    if t < 16.0: return 1.05                               # après-midi calme (~25%)
-    if t < 16.5: return _ramp(t, 16.0, 16.5, 1.05, 1.40) # sortie écoles 16h30
-    if t < 17.0: return _ramp(t, 16.5, 17.0, 1.40, 1.75) # montée rush soir
-    if t < 18.0: return 1.75                               # pic rush soir (~90%)
-    if t < 19.5: return _ramp(t, 18.0, 19.5, 1.75, 1.30) # décrue rush soir
-    if t < 21.0: return _ramp(t, 19.5, 21.0, 1.30, 1.00) # fin rush soir
-    if t < 22.5: return _ramp(t, 21.0, 22.5, 1.00, 0.70) # soirée → nuit
-    return _ramp(t, 22.5, 24.0, 0.70, 0.50)               # transition nuit profonde
+# ─── Profils φ — breakpoints (heure, valeur) ──────────────────────────────────
+# Calibrés sur données réelles Lyon (Criter, CEREMA, EMD 2015).
+# Chaque profil est une liste de (t, φ) interpolée linéairement.
 
+# Semaine standard (lun, mar, jeu, ven hors vacances)
+# Rush soir > rush matin à Lyon. Pics écoles 11h30 et 16h30.
+_BP_SEMAINE = [
+    (0.0, 0.50),   # nuit
+    (5.0, 0.50),   # fin nuit
+    (6.5, 1.00),   # réveil progressif
+    (7.0, 1.55),   # montée rush matin
+    (9.5, 1.60),   # pic rush matin (8h-9h)
+    (10.5, 1.10),  # fin rush matin
+    (11.5, 1.10),  # creux matinée
+    (12.0, 1.25),  # montée midi (écoles 11h30)
+    (13.5, 1.25),  # mini-pic déjeuner
+    (14.5, 1.05),  # retour école/bureau
+    (16.0, 1.05),  # après-midi calme
+    (16.5, 1.40),  # sortie écoles 16h30
+    (17.0, 1.75),  # montée rush soir
+    (18.0, 1.75),  # pic rush soir (~90%)
+    (19.5, 1.30),  # décrue rush soir
+    (21.0, 1.00),  # fin rush soir
+    (22.5, 0.70),  # soirée → nuit
+    (24.0, 0.50),  # nuit profonde
+]
 
-def _phi_mercredi(t: float) -> float:
-    """Profil mercredi hors vacances.
-    Pas d'école l'après-midi → pas de pic écoles 11h30/16h30.
-    Rush matin identique (commuters). Rush soir atténué (-15%, école matin seul)."""
-    if t < 5.0:  return 0.50
-    if t < 6.5:  return _ramp(t, 5.0,  6.5,  0.50, 1.0)
-    if t < 7.0:  return _ramp(t, 6.5,  7.0,  1.0,  1.55) # rush matin identique
-    if t < 9.5:  return _ramp(t, 7.0,  9.5,  1.55, 1.60)
-    if t < 10.5: return _ramp(t, 9.5,  10.5, 1.60, 1.10)
-    if t < 11.5: return 1.10                               # creux matinée
-    if t < 12.5: return _ramp(t, 11.5, 12.5, 1.10, 1.30) # sortie école matin (12h)
-    if t < 13.5: return _ramp(t, 12.5, 13.5, 1.30, 1.05) # retour calme
-    if t < 16.5: return 1.05                               # après-midi calme (pas d'école)
-    if t < 17.0: return _ramp(t, 16.5, 17.0, 1.05, 1.55) # rush soir commuters seulement
-    if t < 18.0: return 1.55                               # pic soir atténué (-15%)
-    if t < 19.5: return _ramp(t, 18.0, 19.5, 1.55, 1.20)
-    if t < 21.0: return _ramp(t, 19.5, 21.0, 1.20, 1.00)
-    if t < 22.5: return _ramp(t, 21.0, 22.5, 1.00, 0.70)
-    return _ramp(t, 22.5, 24.0, 0.70, 0.50)
+# Mercredi hors vacances — pas d'école l'après-midi
+# Rush matin identique, rush soir atténué (-15%)
+_BP_MERCREDI = [
+    (0.0, 0.50),
+    (5.0, 0.50),
+    (6.5, 1.00),
+    (7.0, 1.55),   # rush matin identique
+    (9.5, 1.60),
+    (10.5, 1.10),
+    (11.5, 1.10),
+    (12.5, 1.30),  # sortie école matin (12h)
+    (13.5, 1.05),  # retour calme
+    (16.5, 1.05),  # après-midi calme (pas d'école)
+    (17.0, 1.55),  # rush soir commuters seulement
+    (18.0, 1.55),  # pic soir atténué (-15%)
+    (19.5, 1.20),
+    (21.0, 1.00),
+    (22.5, 0.70),
+    (24.0, 0.50),
+]
 
+# Vacances scolaires (jours de semaine)
+# Commuters présents, pas d'école → rush atténué (~-20%)
+_BP_VACANCES = [
+    (0.0, 0.50),
+    (5.0, 0.50),
+    (6.5, 0.90),
+    (7.0, 1.30),   # rush matin allégé
+    (9.5, 1.35),   # pic matin -20%
+    (10.5, 1.00),
+    (12.0, 1.00),  # matinée calme
+    (13.5, 1.10),  # midi léger
+    (14.5, 1.00),
+    (16.5, 1.00),  # après-midi calme
+    (17.0, 1.45),  # rush soir allégé
+    (18.0, 1.45),  # pic soir -20%
+    (19.5, 1.15),
+    (21.0, 0.90),
+    (22.5, 0.65),
+    (24.0, 0.50),
+]
 
-def _phi_vacances(t: float) -> float:
-    """Profil vacances scolaires (jours de semaine).
-    Commuters présents mais pas d'effet école → rush atténué (~-20%).
-    Pas de pics 11h30/16h30. Midi réduit."""
-    if t < 5.0:  return 0.50
-    if t < 6.5:  return _ramp(t, 5.0,  6.5,  0.50, 0.90)
-    if t < 7.0:  return _ramp(t, 6.5,  7.0,  0.90, 1.30) # rush matin allégé
-    if t < 9.5:  return _ramp(t, 7.0,  9.5,  1.30, 1.35) # pic matin -20%
-    if t < 10.5: return _ramp(t, 9.5,  10.5, 1.35, 1.00)
-    if t < 12.0: return 1.00                               # matinée calme
-    if t < 13.5: return _ramp(t, 12.0, 13.5, 1.00, 1.10) # midi léger
-    if t < 14.5: return _ramp(t, 13.5, 14.5, 1.10, 1.00)
-    if t < 16.5: return 1.00                               # après-midi calme
-    if t < 17.0: return _ramp(t, 16.5, 17.0, 1.00, 1.45) # rush soir allégé
-    if t < 18.0: return 1.45                               # pic soir -20%
-    if t < 19.5: return _ramp(t, 18.0, 19.5, 1.45, 1.15)
-    if t < 21.0: return _ramp(t, 19.5, 21.0, 1.15, 0.90)
-    if t < 22.5: return _ramp(t, 21.0, 22.5, 0.90, 0.65)
-    return _ramp(t, 22.5, 24.0, 0.65, 0.50)
-
-
-def _phi_weekend(t: float) -> float:
-    """Profil weekend et jours fériés.
-    Pas de rush commuter. Pic commercial 10h-18h (shopping Part-Dieu, Confluence).
-    Congestion ~40-50% du pic semaine (Criter/CEREMA). Samedi > dimanche mais profil unique."""
-    if t < 7.0:  return 0.45                               # nuit/grasse mat
-    if t < 9.0:  return _ramp(t, 7.0,  9.0,  0.45, 0.70) # réveil lent
-    if t < 10.0: return _ramp(t, 9.0,  10.0, 0.70, 0.90) # montée shopping
-    if t < 12.0: return 0.90                               # pic commercial matin
-    if t < 13.5: return _ramp(t, 12.0, 13.5, 0.90, 0.95) # midi/restau
-    if t < 14.5: return 0.95                               # début après-midi
-    if t < 17.0: return _ramp(t, 14.5, 17.0, 0.95, 1.00) # pic après-midi
-    if t < 18.5: return 1.00                               # pic commercial soir
-    if t < 20.0: return _ramp(t, 18.5, 20.0, 1.00, 0.75) # fermeture commerces
-    if t < 22.0: return _ramp(t, 20.0, 22.0, 0.75, 0.55) # soirée
-    return _ramp(t, 22.0, 24.0, 0.55, 0.45)               # nuit
-
+# Weekend et jours fériés
+# Pas de rush commuter. Pic commercial 10h-18h (Part-Dieu, Confluence).
+_BP_WEEKEND = [
+    (0.0, 0.45),   # nuit/grasse mat
+    (7.0, 0.45),
+    (9.0, 0.70),   # réveil lent
+    (10.0, 0.90),  # montée shopping
+    (12.0, 0.90),  # pic commercial matin
+    (13.5, 0.95),  # midi/restau
+    (14.5, 0.95),
+    (17.0, 1.00),  # pic après-midi
+    (18.5, 1.00),  # pic commercial soir
+    (20.0, 0.75),  # fermeture commerces
+    (22.0, 0.55),  # soirée
+    (24.0, 0.45),  # nuit
+]
 
 _PHI_PROFILES = {
-    "semaine":  _phi_semaine,
-    "mercredi": _phi_mercredi,
-    "vacances": _phi_vacances,
-    "weekend":  _phi_weekend,
+    "semaine":  _BP_SEMAINE,
+    "mercredi": _BP_MERCREDI,
+    "vacances": _BP_VACANCES,
+    "weekend":  _BP_WEEKEND,
 }
 
 
@@ -299,8 +307,8 @@ def compute_phi(dt: datetime = None) -> float:
         dt = dt.astimezone(LYON_TZ)
 
     t = dt.hour + dt.minute / 60.0
-    profile = _PHI_PROFILES[_day_type(dt)]
-    return profile(t)
+    breakpoints = _PHI_PROFILES[_day_type(dt)]
+    return _phi_from_breakpoints(breakpoints, t)
 
 
 def compute_risk(signals: dict, phi: float, bl: Dict = None) -> float:

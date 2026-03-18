@@ -8,7 +8,8 @@ from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 
 from services.orchestrator import refresh_scores, get_cache_data, get_cache_state, compute_trend
 from services.scoring import compute_forecast, NEIGHBORS, ZONE_NAMES, BASELINE, _effective_baseline, score_all_zones
-from services.storage import get_zone_history, get_recent_alerts, save_forecast_history, get_forecast_accuracy
+from services.storage import get_zone_history, get_recent_alerts
+from services.forecast_storage import save_forecast_history, get_forecast_accuracy
 from services.events import compute_event_signals, STATIC_EVENTS
 from config import ENABLE_HISTORY, WEIGHTS
 
