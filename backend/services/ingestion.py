@@ -132,6 +132,8 @@ async def fetch_weather_forecast() -> Dict[str, float]:
 # ---------------------------------------------------------------------------
 
 _TRAFFIC_NEUTRAL = 1.0    # Criter V=fluide → z≈0 quand données indisponibles
+_PASSAGES_NEUTRAL = 0.5   # Neutre quand données TCL indisponibles (0=plein service, 1=aucun bus)
+_CONGESTION_BOOST = 1.5   # Multiplicateur fraction segments congestionnés (O+R+N)
 
 async def fetch_traffic() -> Dict[str, float]:
     """
@@ -186,8 +188,14 @@ async def fetch_traffic() -> Dict[str, float]:
     for zone, ratios in zone_ratios.items():
         if ratios:
             avg = sum(ratios) / len(ratios)
-            result[zone] = round(max(0.5, min(3.0, avg)), 3)
-            log.info(f"[criter-traffic] zone={zone} segments={len(ratios)} ratio_moy={result[zone]}")
+            n_congested = sum(1 for r in ratios if r >= 2.0)  # O + R + N
+            frac = n_congested / len(ratios)
+            boosted = avg + frac * _CONGESTION_BOOST
+            result[zone] = round(max(0.5, min(3.0, boosted)), 3)
+            log.info(
+                f"[criter-traffic] zone={zone} segments={len(ratios)}"
+                f" ratio_moy={avg:.3f} congestion={frac:.0%} final={result[zone]}"
+            )
         else:
             result[zone] = _TRAFFIC_NEUTRAL
             log.debug(f"[criter-traffic] zone={zone} → aucun segment actif, neutre")
@@ -853,16 +861,18 @@ async def fetch_all_signals() -> tuple:
         parcrelais, passages, velov = await asyncio.gather(
             _fetch_parcrelais(), _fetch_passages(), _fetch_velov()
         )
+        if not passages:
+            log.warning("[transport] passages_tcl vide → probable échec API TCL, fallback neutre")
         def _transport_score(zone: str) -> float:
             return round(
                 parcrelais.get(zone, 0.35) * 0.3
-                + passages.get(zone, 1.0)  * 0.5
+                + passages.get(zone, _PASSAGES_NEUTRAL)  * 0.5
                 + velov.get(zone, 0.5)     * 0.2,
                 4,
             )
         for z in ZONE_CENTROIDS:
             pr = round(parcrelais.get(z, 0.35), 3)
-            pa = round(passages.get(z, 1.0), 3)
+            pa = round(passages.get(z, _PASSAGES_NEUTRAL), 3)
             vl = round(velov.get(z, 0.5), 3)
             transport_detail[z] = {
                 "parcrelais": pr,
