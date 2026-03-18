@@ -285,11 +285,17 @@ def _is_event_active_at(props: dict, target: datetime.datetime) -> bool:
         return True  # échec parsing → inclure par défaut
 
 
+_INCIDENT_BASELINE_MU = 0.8   # mu du baseline incident (scoring.py)
+
+
 def _zone_score_from_weights(weights: list) -> float:
     if not weights:
-        return 0.0
+        # Aucun incident remonté → neutre (baseline), pas 0.0 qui tire z vers −1.3σ
+        return _INCIDENT_BASELINE_MU
     avg     = sum(weights) / len(weights)
-    density = 1 + 0.05 * min(len(weights), 20)
+    # Densité logarithmique : amortit la fragmentation TomTom
+    # 1 incident → ×1.0, 3 → ×1.33, 5 → ×1.48, 10 → ×1.69, 20 → ×1.90
+    density = 1 + 0.3 * math.log(1 + len(weights))
     return round(min(avg * density, 3.0), 3)
 
 
@@ -512,11 +518,63 @@ _TOMTOM_CATEGORY_LABEL: Dict[int, str] = {
 }
 
 
-def _tomtom_weight(icon_cat: int, magnitude: int) -> float:
+def _tomtom_weight(icon_cat: int, magnitude: int, delay_s: int = 0) -> float:
     base = _TOMTOM_BASE_WEIGHT.get(icon_cat, 0.5)
     # magnitude : 1=mineur 2=modéré 3=majeur → +0 / +15% / +30%
     mult = {1: 1.0, 2: 1.15, 3: 1.30}.get(magnitude, 1.0)
-    return round(base * mult, 2)
+    # Pondération par le retard réel — incidents à 0 delay pèsent 55 % max
+    # (route fermée sans delay = impact réel mais non mesuré par TomTom)
+    delay_min = int(delay_s) / 60 if delay_s else 0
+    delay_factor = max(0.55, min(delay_min / 5.0, 1.0))
+    return round(base * mult * delay_factor, 2)
+
+
+_CLUSTER_RADIUS_DEG = 200.0 / 111_100  # 200 m en degrés latitude
+
+
+def _cluster_tomtom_incidents(incidents: list) -> list:
+    """Regroupe les incidents TomTom à <200 m dans la même zone/catégorie.
+
+    Pour chaque cluster, on garde l'incident de poids max (représentant)
+    et on cumule le delay.  Ça élimine la fragmentation multi-segments
+    des chantiers et fermetures TomTom.
+    """
+    if not incidents:
+        return incidents
+
+    from collections import defaultdict
+    by_zone_cat: Dict[tuple, list] = defaultdict(list)
+    for inc in incidents:
+        key = (inc["zone"], inc["evt_type"])
+        by_zone_cat[key].append(inc)
+
+    result = []
+    r2 = _CLUSTER_RADIUS_DEG ** 2
+    cos2 = _COS_LAT_LYON ** 2
+
+    for _key, group in by_zone_cat.items():
+        clusters: list[list] = []
+        for inc in sorted(group, key=lambda x: -x["weight"]):
+            merged = False
+            for cluster in clusters:
+                ref = cluster[0]
+                d2 = (inc["lat"] - ref["lat"]) ** 2 + ((inc["lon"] - ref["lon"]) ** 2) * cos2
+                if d2 <= r2:
+                    cluster.append(inc)
+                    merged = True
+                    break
+            if not merged:
+                clusters.append([inc])
+
+        for cluster in clusters:
+            rep = cluster[0]  # poids max (déjà trié desc)
+            # Cumuler le delay pour refléter l'impact total du cluster
+            total_delay = sum(c.get("delay_min", 0) for c in cluster)
+            rep["delay_min"] = total_delay
+            result.append(rep)
+
+    log.info(f"[tomtom-cluster] {len(incidents)} bruts → {len(result)} après clustering 200m")
+    return result
 
 
 async def _fetch_tomtom_incidents_cached() -> list:
@@ -568,7 +626,8 @@ async def _fetch_tomtom_incidents_cached() -> list:
 
         icon_cat  = int(props.get("iconCategory", 0))
         magnitude = int(props.get("magnitudeOfDelay", 1))
-        weight    = _tomtom_weight(icon_cat, magnitude)
+        delay_s   = props.get("delay") or 0
+        weight    = _tomtom_weight(icon_cat, magnitude, delay_s=delay_s)
         if weight <= 0:
             continue
 
@@ -580,7 +639,6 @@ async def _fetch_tomtom_incidents_cached() -> list:
         label     = (desc or _TOMTOM_CATEGORY_LABEL.get(icon_cat, "Incident"))[:70]
         detail    = from_to[:80]
 
-        delay_s   = props.get("delay") or 0
         delay_min = round(int(delay_s) / 60) if delay_s else 0
 
         result.append({
@@ -592,9 +650,14 @@ async def _fetch_tomtom_incidents_cached() -> list:
             "delay_min": delay_min,
             "evt_type":  _TOMTOM_CATEGORY_TYPE.get(icon_cat, "other"),
             "icon_cat":  icon_cat,
+            "lat":       float(lat),
+            "lon":       float(lon),
         })
 
-    log.info(f"[tomtom-incidents] {len(result)} incidents actifs (1 appel API)")
+    # ── Clustering géographique : regrouper incidents TomTom <200m ──
+    result = _cluster_tomtom_incidents(result)
+
+    log.info(f"[tomtom-incidents] {len(result)} incidents après clustering (1 appel API)")
     _tomtom_cache["data"]       = result
     _tomtom_cache["fetched_at"] = now
     return result

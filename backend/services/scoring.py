@@ -311,8 +311,19 @@ def compute_phi(dt: datetime = None) -> float:
     return _phi_from_breakpoints(breakpoints, t)
 
 
+# Signaux pour lesquels 0.0 = "pas d'activité" (pas "plus calme que d'habitude").
+# Leur z négatif ne doit pas réduire le risk — clampé à 0.
+_NEUTRAL_WHEN_LOW = frozenset({"weather", "event", "incident"})
+
+
 def compute_risk(signals: dict, phi: float, bl: Dict = None) -> float:
-    return phi * sum(WEIGHTS[s] * normalize(v, s, bl) for s, v in signals.items())
+    total = 0.0
+    for s, v in signals.items():
+        z = normalize(v, s, bl)
+        if s in _NEUTRAL_WHEN_LOW:
+            z = max(z, 0.0)
+        total += WEIGHTS[s] * z
+    return phi * total
 
 
 def compute_anomaly(signals: dict, bl: Dict = None) -> float:
