@@ -6,7 +6,7 @@ function Delta({ value }: { value: number | null }) {
   const sign = value > 0 ? "+" : "";
   const color = value > 5 ? "#ef4444" : value > 0 ? "#f97316" : "#22c55e";
   return (
-    <span style={{ color, fontWeight: 600, fontSize: 13 }}>
+    <span className="text-[13px] font-semibold" style={{ color }}>
       {sign}{value} pts
     </span>
   );
@@ -22,15 +22,8 @@ function LevelBadge({ level }: { level: string }) {
   const c = colors[level] ?? "var(--text-muted)";
   return (
     <span
-      style={{
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "0.08em",
-        padding: "2px 8px",
-        borderRadius: 4,
-        background: `${c}1a`,
-        color: c,
-      }}
+      className="rounded px-2 py-0.5 text-[10px] font-bold tracking-wider"
+      style={{ background: `${c}1a`, color: c }}
     >
       {level}
     </span>
@@ -49,21 +42,11 @@ function SummaryCards({ report }: { report: ImpactReport }) {
   ];
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8 }}>
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-2">
       {cards.map((c) => (
-        <div
-          key={c.label}
-          style={{
-            background: "var(--bg-card)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            padding: "10px 14px",
-          }}
-        >
-          <div style={{ fontSize: 9, color: "var(--text-secondary)", letterSpacing: "0.08em", marginBottom: 4 }}>
-            {c.label}
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: c.color }}>{c.value}</div>
+        <div key={c.label} className="rounded-lg border border-border bg-bg-card px-3.5 py-2.5">
+          <div className="mb-1 text-[9px] tracking-wider text-text-secondary">{c.label}</div>
+          <div className="text-xl font-bold" style={{ color: c.color }}>{c.value}</div>
         </div>
       ))}
     </div>
@@ -75,40 +58,31 @@ function BaselineComparison({ report }: { report: ImpactReport }) {
   if (s.baseline_avg_score == null) return null;
 
   return (
-    <div
-      style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        padding: 16,
-      }}
-    >
-      <div style={{ fontSize: 11, color: "var(--text-secondary)", letterSpacing: "0.06em", marginBottom: 10 }}>
+    <div className="rounded-lg border border-border bg-bg-card p-4">
+      <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
         COMPARAISON AVEC PÉRIODE DE RÉFÉRENCE
       </div>
-      <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="flex flex-wrap items-center gap-6">
         <div>
-          <div style={{ fontSize: 10, color: "var(--text-muted)" }}>Référence</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(s.baseline_avg_score) }}>
+          <div className="text-[10px] text-text-muted">Référence</div>
+          <div className="text-lg font-bold" style={{ color: scoreColor(s.baseline_avg_score) }}>
             {s.baseline_avg_score}
           </div>
         </div>
-        <div style={{ fontSize: 20, color: "var(--text-muted)" }}>→</div>
+        <div className="text-xl text-text-muted">→</div>
         <div>
-          <div style={{ fontSize: 10, color: "var(--text-muted)" }}>Événement</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(s.global_avg_score) }}>
+          <div className="text-[10px] text-text-muted">Événement</div>
+          <div className="text-lg font-bold" style={{ color: scoreColor(s.global_avg_score) }}>
             {s.global_avg_score}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 10, color: "var(--text-muted)" }}>Delta</div>
-          <div style={{ fontSize: 18 }}>
-            <Delta value={s.delta_vs_baseline} />
-          </div>
+          <div className="text-[10px] text-text-muted">Delta</div>
+          <div className="text-lg"><Delta value={s.delta_vs_baseline} /></div>
         </div>
       </div>
       {report.baseline_period && (
-        <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 8 }}>
+        <div className="mt-2 text-[10px] text-text-muted">
           Période de référence : {report.baseline_period.start.split("T")[0]} → {report.baseline_period.end.split("T")[0]}
         </div>
       )}
@@ -121,53 +95,22 @@ function TopZones({ report }: { report: ImpactReport }) {
   if (!zones.length) return null;
 
   return (
-    <div
-      style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        padding: 16,
-      }}
-    >
-      <div style={{ fontSize: 11, color: "var(--text-secondary)", letterSpacing: "0.06em", marginBottom: 10 }}>
+    <div className="rounded-lg border border-border bg-bg-card p-4">
+      <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
         TOP ZONES IMPACTÉES
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="flex flex-col gap-2">
         {zones.map((z, i) => (
-          <div
-            key={z.zone_id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "8px 12px",
-              borderRadius: 6,
-              background: "var(--bg-inner)",
-            }}
-          >
+          <div key={z.zone_id} className="flex items-center gap-3 rounded-md bg-bg-inner px-3 py-2">
             <div
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: "50%",
-                background: scoreColor(z.peak_score),
-                color: "#fff",
-                fontSize: 11,
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              className="flex size-6 items-center justify-center rounded-full text-[11px] font-bold text-white"
+              style={{ background: scoreColor(z.peak_score) }}
             >
               {i + 1}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-                {z.zone_name}
-              </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                Moy. {z.avg_score} · Pic {z.peak_score}
-              </div>
+            <div className="flex-1">
+              <div className="text-[13px] font-semibold text-text-primary">{z.zone_name}</div>
+              <div className="text-[11px] text-text-muted">Moy. {z.avg_score} · Pic {z.peak_score}</div>
             </div>
             <LevelBadge level={z.peak_level} />
           </div>
@@ -177,44 +120,34 @@ function TopZones({ report }: { report: ImpactReport }) {
   );
 }
 
-function ZoneDetail({ zoneId, zone }: { zoneId: string; zone: ImpactZone }) {
+function ZoneDetailCard({ zoneId, zone }: { zoneId: string; zone: ImpactZone }) {
   const levels = zone.level_distribution;
   const total = Object.values(levels).reduce((a, b) => a + b, 0);
 
   return (
-    <div
-      style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        padding: 14,
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-          {zone.zone_name}
-        </div>
+    <div className="rounded-lg border border-border bg-bg-card p-3.5">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-[13px] font-semibold text-text-primary">{zone.zone_name}</div>
         <LevelBadge level={zone.peak_level} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+      <div className="mb-2.5 grid grid-cols-3 gap-2">
         <div>
-          <div style={{ fontSize: 9, color: "var(--text-muted)", letterSpacing: "0.06em" }}>MOY.</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: scoreColor(zone.avg_score) }}>{zone.avg_score}</div>
+          <div className="text-[9px] tracking-wide text-text-muted">MOY.</div>
+          <div className="text-base font-bold" style={{ color: scoreColor(zone.avg_score) }}>{zone.avg_score}</div>
         </div>
         <div>
-          <div style={{ fontSize: 9, color: "var(--text-muted)", letterSpacing: "0.06em" }}>PIC</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: scoreColor(zone.peak_score) }}>{zone.peak_score}</div>
+          <div className="text-[9px] tracking-wide text-text-muted">PIC</div>
+          <div className="text-base font-bold" style={{ color: scoreColor(zone.peak_score) }}>{zone.peak_score}</div>
         </div>
         <div>
-          <div style={{ fontSize: 9, color: "var(--text-muted)", letterSpacing: "0.06em" }}>DELTA</div>
-          <div style={{ fontSize: 16 }}><Delta value={zone.delta_vs_baseline} /></div>
+          <div className="text-[9px] tracking-wide text-text-muted">DELTA</div>
+          <div className="text-base"><Delta value={zone.delta_vs_baseline} /></div>
         </div>
       </div>
 
-      {/* Level distribution bar */}
       {total > 0 && (
-        <div style={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", marginBottom: 8 }}>
+        <div className="mb-2 flex h-1.5 overflow-hidden rounded-sm">
           {(["CALME", "MODÉRÉ", "TENDU", "CRITIQUE"] as const).map((l) => {
             const pct = ((levels[l] ?? 0) / total) * 100;
             if (pct === 0) return null;
@@ -231,16 +164,15 @@ function ZoneDetail({ zoneId, zone }: { zoneId: string; zone: ImpactZone }) {
         </div>
       )}
 
-      {/* Signal breakdown */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 10, color: "var(--text-muted)" }}>
+      <div className="flex flex-wrap gap-2 text-[10px] text-text-muted">
         {Object.entries(zone.signal_averages_normalized).map(([sig, val]) => (
-          <span key={sig} style={{ background: "var(--bg-control)", padding: "2px 6px", borderRadius: 3 }}>
+          <span key={sig} className="rounded-sm bg-bg-control px-1.5 py-0.5">
             {sig} {val > 0 ? "+" : ""}{val.toFixed(2)}σ
           </span>
         ))}
       </div>
 
-      <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 6 }}>
+      <div className="mt-1.5 text-[10px] text-text-faint">
         {zone.data_points} relevés · {zone.readings_tendu} TENDU · {zone.readings_critique} CRITIQUE
       </div>
     </div>
@@ -252,37 +184,17 @@ function AlertsList({ alerts }: { alerts: Alert[] }) {
   const emojis: Record<string, string> = { CRITIQUE: "\u{1f534}", TENDU: "\u{1f7e0}", CALME: "\u{1f7e2}" };
 
   return (
-    <div
-      style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        padding: 16,
-      }}
-    >
-      <div style={{ fontSize: 11, color: "var(--text-secondary)", letterSpacing: "0.06em", marginBottom: 10 }}>
+    <div className="rounded-lg border border-border bg-bg-card p-4">
+      <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
         ALERTES DÉCLENCHÉES ({alerts.length})
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto" }}>
+      <div className="flex max-h-[200px] flex-col gap-1 overflow-y-auto">
         {alerts.map((a, i) => (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              fontSize: 12,
-              padding: "4px 8px",
-              borderRadius: 4,
-              background: "var(--bg-inner)",
-            }}
-          >
+          <div key={i} className="flex items-center gap-2 rounded bg-bg-inner px-2 py-1 text-xs">
             <span>{emojis[a.alert_type] ?? ""}</span>
-            <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{a.zone_name}</span>
-            <span style={{ color: "var(--text-muted)" }}>
-              {a.prev_score} → {a.urban_score}
-            </span>
-            <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-faint)" }}>
+            <span className="font-semibold text-text-primary">{a.zone_name}</span>
+            <span className="text-text-muted">{a.prev_score} → {a.urban_score}</span>
+            <span className="ml-auto text-[10px] text-text-faint">
               {a.ts.replace("T", " ").slice(0, 16)}
             </span>
           </div>
@@ -299,22 +211,14 @@ export default function ImpactReportView({ report }: { report: ImpactReport }) {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Header */}
-      <div
-        style={{
-          background: "var(--bg-card)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          padding: 16,
-        }}
-      >
-        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
+    <div className="flex flex-col gap-4">
+      <div className="rounded-lg border border-border bg-bg-card p-4">
+        <div className="mb-1 text-base font-bold text-text-primary">
           {report.event_name
             ? `Rapport d'impact — ${report.event_name}`
             : "Rapport d'impact — Période personnalisée"}
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+        <div className="text-xs text-text-muted">
           {report.period.start.split("T")[0]} → {report.period.end.split("T")[0]}
         </div>
       </div>
@@ -323,35 +227,20 @@ export default function ImpactReportView({ report }: { report: ImpactReport }) {
       <BaselineComparison report={report} />
       <TopZones report={report} />
 
-      {/* All zones detail */}
       <div>
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--text-secondary)",
-            letterSpacing: "0.06em",
-            marginBottom: 8,
-          }}
-        >
+        <div className="mb-2 text-[11px] tracking-wide text-text-secondary">
           DÉTAIL PAR ZONE ({sortedZones.length})
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: 10,
-          }}
-        >
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
           {sortedZones.map(([id, zone]) => (
-            <ZoneDetail key={id} zoneId={id} zone={zone} />
+            <ZoneDetailCard key={id} zoneId={id} zone={zone} />
           ))}
         </div>
       </div>
 
       <AlertsList alerts={report.alerts} />
 
-      {/* Footer */}
-      <div style={{ fontSize: 10, color: "var(--text-faint)", textAlign: "center", paddingTop: 8 }}>
+      <div className="pt-2 text-center text-[10px] text-text-faint">
         Rapport généré par Urban Signal Engine · Données historiques issues de {report.summary.total_data_points} relevés
       </div>
     </div>
