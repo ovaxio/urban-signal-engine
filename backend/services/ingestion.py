@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import asyncio
@@ -7,31 +8,12 @@ import logging
 from typing import Dict, Optional
 
 import httpx
-from config import APIS, ENABLE_HISTORY, CRITER_ETAT_TO_RATIO
+from config import APIS, ENABLE_HISTORY, CRITER_ETAT_TO_RATIO, ZONE_CENTROIDS
 from services.events import fetch_event_signals
 from services.smoothing import smooth_signals
 
 
 log = logging.getLogger("ingestion")
-
-# ---------------------------------------------------------------------------
-# Centroïdes des 12 zones
-# ---------------------------------------------------------------------------
-
-ZONE_CENTROIDS = {
-    "part-dieu":    (45.7602, 4.8598),
-    "presquile":    (45.7558, 4.8320),
-    "vieux-lyon":   (45.7622, 4.8271),
-    "perrache":     (45.7488, 4.8286),
-    "gerland":      (45.7283, 4.8336),
-    "guillotiere":  (45.7490, 4.8460),
-    "brotteaux":    (45.7660, 4.8540),
-    "villette":     (45.7720, 4.8620),
-    "montchat":     (45.7560, 4.8760),
-    "fourviere":    (45.7622, 4.8200),
-    "croix-rousse": (45.7760, 4.8320),
-    "confluence":   (45.7380, 4.8170),
-}
 
 # ---------------------------------------------------------------------------
 # Helper HTTP
@@ -46,10 +28,15 @@ async def safe_get(client: httpx.AsyncClient, url: str, params: dict = None) -> 
         log.warning(f"API call failed [{url}]: {e}")
         return None
 
+# Correction cosinus à la latitude de Lyon (~45.76°) pour que
+# 1° de longitude pèse autant que 1° de latitude en distance réelle.
+_COS_LAT_LYON = math.cos(math.radians(45.76))
+
+
 def _nearest_zone(lat: float, lon: float) -> Optional[str]:
     best, best_d = None, float("inf")
     for zone, (zlat, zlon) in ZONE_CENTROIDS.items():
-        d = (lat - zlat) ** 2 + (lon - zlon) ** 2
+        d = (lat - zlat) ** 2 + ((lon - zlon) * _COS_LAT_LYON) ** 2
         if d < best_d:
             best_d, best = d, zone
     return best
@@ -819,13 +806,13 @@ async def fetch_all_signals() -> tuple:
         def _transport_score(zone: str) -> float:
             return round(
                 parcrelais.get(zone, 0.35) * 0.3
-                + passages.get(zone, 0.0)  * 0.5
+                + passages.get(zone, 1.0)  * 0.5
                 + velov.get(zone, 0.5)     * 0.2,
                 4,
             )
         for z in ZONE_CENTROIDS:
             pr = round(parcrelais.get(z, 0.35), 3)
-            pa = round(passages.get(z, 0.0), 3)
+            pa = round(passages.get(z, 1.0), 3)
             vl = round(velov.get(z, 0.5), 3)
             transport_detail[z] = {
                 "parcrelais": pr,

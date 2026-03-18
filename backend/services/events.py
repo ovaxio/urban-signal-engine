@@ -7,25 +7,9 @@ import math
 from datetime import date, timedelta
 from typing import Dict, List
 
-log = logging.getLogger("service.events")
+from config import ZONE_CENTROIDS
 
-# ──────────────────────────────────────────────
-# Centroïdes des zones (lat, lng)
-# ──────────────────────────────────────────────
-ZONE_CENTROIDS: Dict[str, tuple] = {
-    "part-dieu":    (45.7602, 4.8598),
-    "presquile":    (45.7558, 4.8320),
-    "vieux-lyon":   (45.7622, 4.8271),
-    "perrache":     (45.7488, 4.8286),
-    "gerland":      (45.7283, 4.8336),
-    "guillotiere":  (45.7490, 4.8460),
-    "brotteaux":    (45.7660, 4.8540),
-    "villette":     (45.7720, 4.8620),
-    "montchat":     (45.7560, 4.8760),
-    "fourviere":    (45.7622, 4.8200),
-    "croix-rousse": (45.7760, 4.8320),
-    "confluence":   (45.7380, 4.8170),
-}
+log = logging.getLogger("service.events")
 
 EVENT_RADIUS_KM = 1.2
 

@@ -1,110 +1,19 @@
-import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional
-
 import re
+from datetime import datetime, timezone
 from datetime import date as date_type
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
-from services.ingestion import fetch_all_signals
-from services.scoring import score_all_zones, compute_forecast, NEIGHBORS, ZONE_NAMES, BASELINE, _effective_baseline
-from services.storage import (
-    save_scores_history, get_zone_history, get_recent_alerts,
-    save_forecast_history, evaluate_forecasts, flag_incident_surprises,
-    get_forecast_accuracy,
-)
-from services.alerts import check_alerts, dispatch_alerts
+
+from services.orchestrator import refresh_scores, get_cache_data, get_cache_state, compute_trend
+from services.scoring import compute_forecast, NEIGHBORS, ZONE_NAMES, BASELINE, _effective_baseline, score_all_zones
+from services.storage import get_zone_history, get_recent_alerts, save_forecast_history, get_forecast_accuracy
 from services.events import compute_event_signals, STATIC_EVENTS
-from config import CACHE_TTL_SECONDS, ENABLE_HISTORY, WEIGHTS
+from config import ENABLE_HISTORY, WEIGHTS
 
 log = logging.getLogger("router.zones")
 router = APIRouter(prefix="/zones", tags=["zones"])
-
-_cache: dict = {
-    "scores":            None,
-    "signals":           None,
-    "incident_schedule": {},   # Dict[zone_id, Dict[int, float]] — incidents planifiés
-    "incident_events":   {},   # Dict[zone_id, List[dict]]        — détails événements actifs
-    "weather_forecast":  {},   # Dict[str, float]                  — météo horaire prévue (48h)
-    "transport_detail":  {},   # Dict[zone_id, dict]               — détail sous-composantes transport
-    "fetched_at":        None,
-    "lock":              asyncio.Lock(),
-    "prev_scores":       {},   # snapshot des scores du cycle précédent pour calcul tendance
-}
-
-
-async def _get_scores(force_refresh: bool = False) -> List[dict]:
-    async with _cache["lock"]:
-        now = datetime.now(timezone.utc)
-        age = (now - _cache["fetched_at"]).total_seconds() if _cache["fetched_at"] else None
-        if force_refresh or _cache["scores"] is None or (age and age > CACHE_TTL_SECONDS):
-            log.info("Refreshing signals...")
-
-            # Snapshot scores précédents avant refresh
-            if _cache["scores"]:
-                _cache["prev_scores"] = {
-                    z["zone_id"]: z["urban_score"] for z in _cache["scores"]
-                }
-
-            signals, incident_schedule, incident_events, weather_fc, transport_detail = await fetch_all_signals()
-            scores  = score_all_zones(signals)
-
-            if ENABLE_HISTORY:
-                save_scores_history(scores)
-
-            # Évaluer les forecasts passés par rapport aux scores actuels
-            evaluate_forecasts(scores)
-            flag_incident_surprises(incident_events)
-
-            # Sauvegarder les forecasts pour TOUTES les zones (accuracy tracking)
-            if ENABLE_HISTORY:
-                zone_map = {z["zone_id"]: z for z in scores}
-                for z in scores:
-                    zid = z["zone_id"]
-                    trend = _compute_trend(zid, z["urban_score"])
-                    fc = compute_forecast(
-                        z["urban_score"],
-                        z["alert"],
-                        z["components"]["spread"],
-                        dt=now,
-                        trend=trend,
-                        signals=z.get("raw_signals"),
-                        incident_schedule=incident_schedule.get(zid),
-                        bl=_effective_baseline(zid),
-                        zone_id=zid,
-                        weather_forecast=weather_fc,
-                    )
-                    save_forecast_history(zid, fc, z["urban_score"])
-
-            # Détection d'alertes sur franchissement de seuil
-            new_alerts = check_alerts(_cache["prev_scores"], scores)
-            if new_alerts:
-                asyncio.create_task(dispatch_alerts(new_alerts))
-
-            _cache["scores"]            = scores
-            _cache["signals"]           = signals
-            _cache["incident_schedule"] = incident_schedule
-            _cache["incident_events"]   = incident_events
-            _cache["weather_forecast"]  = weather_fc
-            _cache["transport_detail"]  = transport_detail
-            _cache["fetched_at"]        = now
-
-    return _cache["scores"]
-
-
-def _compute_trend(zone_id: str, current_score: int) -> float:
-    """
-    Tendance = delta score entre cycle actuel et précédent.
-    Normalisée par CACHE_TTL pour avoir une unité /min.
-    Retourne 0.0 si pas d'historique.
-    """
-    prev = _cache["prev_scores"].get(zone_id)
-    if prev is None:
-        return 0.0
-    delta = current_score - prev
-    ttl_min = CACHE_TTL_SECONDS / 60.0
-    return round(delta / ttl_min, 4)   # points/min
 
 
 @router.get("/scores")
@@ -113,7 +22,7 @@ async def get_all_scores(
     level:     Optional[str] = Query(None),
     sort:      str           = Query("score_desc"),
 ):
-    scores = await _get_scores()
+    scores = await refresh_scores()
     result = scores
     if min_score is not None:
         result = [z for z in result if z["urban_score"] >= min_score]
@@ -123,13 +32,13 @@ async def get_all_scores(
     elif sort == "score_asc":  result = sorted(result, key=lambda z: z["urban_score"])
     elif sort == "zone_asc":   result = sorted(result, key=lambda z: z["zone_name"])
     clean = [{k: v for k, v in z.items() if k != "alert"} for z in result]
-    age = int((datetime.now(timezone.utc) - _cache["fetched_at"]).total_seconds()) if _cache["fetched_at"] else None
-    return {"count": len(clean), "refreshed_at": _cache["fetched_at"].isoformat() if _cache["fetched_at"] else None, "cache_age_s": age, "zones": clean}
+    state = get_cache_state()
+    return {"count": len(clean), "refreshed_at": state["fetched_at"], "cache_age_s": state["cache_age_s"], "zones": clean}
 
 
 @router.get("/{zone_id}/detail")
 async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
-    scores   = await _get_scores(force_refresh=force_refresh)
+    scores   = await refresh_scores(force=force_refresh)
     zone_map = {z["zone_id"]: z for z in scores}
     if zone_id not in zone_map:
         raise HTTPException(status_code=404, detail=f"Zone '{zone_id}' introuvable.")
@@ -142,24 +51,29 @@ async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
          "level": zone_map[n]["level"], "top_causes": zone_map[n]["top_causes"]}
         for n in NEIGHBORS.get(zone_id, []) if n in zone_map
     ]
+    incident_events = get_cache_data("incident_events") or {}
+    transport_detail = get_cache_data("transport_detail") or {}
     return {
         **{k: v for k, v in z.items() if k != "alert"},
         "explanation":     explanation,
         "neighbors":       neighbors,
-        "incident_events": _cache["incident_events"].get(zone_id, []),
-        "transport_detail": _cache["transport_detail"].get(zone_id),
+        "incident_events": incident_events.get(zone_id, []),
+        "transport_detail": transport_detail.get(zone_id),
         "weights":         {k: round(v * 100) for k, v in WEIGHTS.items()},
     }
 
 
 @router.get("/{zone_id}/forecast")
 async def get_zone_forecast(zone_id: str, force_refresh: bool = Query(False)):
-    scores   = await _get_scores(force_refresh=force_refresh)
+    scores   = await refresh_scores(force=force_refresh)
     zone_map = {z["zone_id"]: z for z in scores}
     if zone_id not in zone_map:
         raise HTTPException(status_code=404, detail=f"Zone '{zone_id}' introuvable.")
     z     = zone_map[zone_id]
-    trend = _compute_trend(zone_id, z["urban_score"])  # ← points/min
+    trend = compute_trend(zone_id, z["urban_score"])
+
+    incident_schedule = get_cache_data("incident_schedule") or {}
+    weather_forecast = get_cache_data("weather_forecast") or {}
 
     forecast = compute_forecast(
         z["urban_score"],
@@ -168,13 +82,12 @@ async def get_zone_forecast(zone_id: str, force_refresh: bool = Query(False)):
         dt=datetime.now(timezone.utc),
         trend=trend,
         signals=z.get("raw_signals"),
-        incident_schedule=_cache["incident_schedule"].get(zone_id),
+        incident_schedule=incident_schedule.get(zone_id),
         bl=_effective_baseline(zone_id),
         zone_id=zone_id,
-        weather_forecast=_cache.get("weather_forecast"),
+        weather_forecast=weather_forecast,
     )
 
-    # Sauvegarder le forecast pour évaluation ultérieure (throttlé)
     if ENABLE_HISTORY:
         save_forecast_history(zone_id, forecast, z["urban_score"])
 
@@ -183,7 +96,7 @@ async def get_zone_forecast(zone_id: str, force_refresh: bool = Query(False)):
         "zone_name":     z["zone_name"],
         "current_score": z["urban_score"],
         "current_level": z["level"],
-        "trend_per_min": trend,   # visible pour debug
+        "trend_per_min": trend,
         "forecast":      forecast,
         "disclaimer":    "Prévision probabiliste. Confiance décroissante au-delà de 2h.",
     }
@@ -194,7 +107,7 @@ async def get_zone_history_endpoint(
     zone_id: str,
     limit: int = Query(48, ge=1, le=500),
 ):
-    scores   = await _get_scores()
+    scores   = await refresh_scores()
     zone_ids = {z["zone_id"] for z in scores}
     if zone_id not in zone_ids:
         raise HTTPException(status_code=404, detail=f"Zone '{zone_id}' introuvable.")
@@ -225,7 +138,7 @@ async def get_alerts(limit: int = Query(50, ge=1, le=200)):
 
 @router.post("/refresh")
 async def force_refresh(background_tasks: BackgroundTasks):
-    background_tasks.add_task(_get_scores, force_refresh=True)
+    background_tasks.add_task(refresh_scores, force=True)
     return {"status": "refresh_scheduled"}
 
 
@@ -297,7 +210,6 @@ async def simulate_zone_detail(zone_id: str, date: str = Query(..., description=
     """
     Retourne le détail simulé d'une zone pour une date donnée.
     Même structure que /zones/{id}/detail avec champs sim_date et sim_events en plus.
-    Pas de forecast (sans sens pour une simulation).
     """
     d = _parse_sim_date(date)
     scores, active_events = _build_sim_scores(d, date)

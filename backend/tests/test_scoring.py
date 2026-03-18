@@ -28,13 +28,15 @@ from services.scoring import (
     score_all_zones,
     NEIGHBORS,
     ZONE_NAMES,
-    _easter,
-    _jours_feries,
-    _is_vacances,
-    _is_ferie,
-    _day_type,
     _soft_gate,
     _validate_config,
+)
+from services.calendar_utils import (
+    _easter,
+    _jours_feries,
+    is_vacances as _is_vacances,
+    is_ferie as _is_ferie,
+    day_type as _day_type,
 )
 from config import LAMBDA, WEIGHTS, ALPHA, THETA, BETA, CONV_BETA_SUM_MAX, CONV_THETA_EPSILON
 

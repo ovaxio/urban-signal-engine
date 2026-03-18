@@ -25,7 +25,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from routers.zones import router as zones_router, _get_scores
+from routers.zones import router as zones_router
+from services.orchestrator import refresh_scores, get_cache_state
 from routers.contact import router as contact_router
 from routers.admin import router as admin_router
 from routers.reports import router as reports_router
@@ -45,7 +46,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[_rate_limit])
 async def _refresh_loop():
     while True:
         try:
-            await _get_scores(force_refresh=True)
+            await refresh_scores(force=True)
         except Exception as e:
             log.error(f"Refresh error: {e}")
         await asyncio.sleep(CACHE_TTL_SECONDS)
@@ -90,28 +91,25 @@ def _apply_calibration(min_count: int = 96) -> None:
     incident sont calibrés automatiquement depuis l'historique Criter.
     Appelé au démarrage et toutes les 7 jours à 3h00.
     """
-    # Seul event reste fixe (non-stationnaire)
-    scoring.BASELINE["event"] = _EVENT_BASELINE_DEFAULT.copy()
+    global_bl = {"event": _EVENT_BASELINE_DEFAULT.copy()}
 
     baselines = get_calibration_baselines(min_count=min_count)
     if not baselines:
         log.info("Recalibration : données insuffisantes, baselines conservées.")
     else:
         for signal, values in baselines.items():
-            if signal in scoring.BASELINE:
-                old = scoring.BASELINE[signal]
-                scoring.BASELINE[signal] = values
-                log.info(
-                    f"Recalibration globale [{signal}] : "
-                    f"mu {old['mu']} → {values['mu']} | "
-                    f"sigma {old['sigma']} → {values['sigma']}"
-                )
+            old = scoring.BASELINE.get(signal, {})
+            global_bl[signal] = values
+            log.info(
+                f"Recalibration globale [{signal}] : "
+                f"mu {old.get('mu')} → {values['mu']} | "
+                f"sigma {old.get('sigma')} → {values['sigma']}"
+            )
         log.info("Recalibration globale terminée.")
 
-    # Recalibration par zone (remplace ZONE_BASELINES)
     zone_baselines = get_calibration_baselines_per_zone(min_count=min_count // 2)
-    scoring.ZONE_BASELINES.clear()
-    scoring.ZONE_BASELINES.update(zone_baselines)
+
+    scoring.set_baselines(global_bl, zone_baselines)
     log.info("Recalibration par zone : %d zones calibrées.", len(zone_baselines))
 
 
@@ -212,15 +210,13 @@ app.include_router(reports_router)
 
 @app.get("/health", tags=["system"])
 async def health():
-    from routers.zones import _cache
-    from datetime import datetime, timezone
-    age = int((datetime.now(timezone.utc) - _cache["fetched_at"]).total_seconds()) if _cache["fetched_at"] else None
+    state = get_cache_state()
     return {
-        "status":   "ok",
-        "zones":    12,
-        "cache_age": age,
-        "ttl":      CACHE_TTL_SECONDS,
-        "baseline": scoring.BASELINE,
+        "status":    "ok",
+        "zones":     12,
+        "cache_age": state["cache_age_s"],
+        "ttl":       CACHE_TTL_SECONDS,
+        "baseline":  scoring.BASELINE,
     }
 
 

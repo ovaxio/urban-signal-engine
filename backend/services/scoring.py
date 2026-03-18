@@ -60,8 +60,8 @@ rapport à un signal isolé élevé.
 """
 
 import math
-from datetime import datetime, date, timezone, timedelta
-from typing import List, Dict, Tuple
+from datetime import datetime, timezone, timedelta
+from typing import List, Dict
 from zoneinfo import ZoneInfo
 
 LYON_TZ = ZoneInfo("Europe/Paris")
@@ -70,6 +70,7 @@ from config import (
     EPSILON, WEIGHTS, LAMBDA, THETA, ALPHA, BETA,
     SPATIAL_KERNEL_DECAY, FORECAST_HORIZONS, FORECAST_HORIZONS_EXTENDED,
 )
+from services.calendar_utils import day_type as _day_type, load_vacances_from_db
 
 import logging as _logging
 _log = _logging.getLogger("scoring")
@@ -110,108 +111,6 @@ def _validate_config() -> None:
 _validate_config()
 
 
-# ─── Calendrier scolaire & jours fériés ───────────────────────────────────
-# Chargé dynamiquement depuis la DB (refresh tous les 3 mois via API education.gouv.fr)
-# Fallback hardcodé si la DB est vide (premier démarrage)
-
-_FALLBACK_VACANCES: List[Tuple[date, date]] = [
-    # 2025-2026 — Zone A (Lyon) — source : education.gouv.fr
-    (date(2025, 10, 18), date(2025, 11, 3)),   # Toussaint
-    (date(2025, 12, 20), date(2026, 1, 5)),     # Noël
-    (date(2026, 2, 7),   date(2026, 2, 23)),    # Hiver
-    (date(2026, 4, 4),   date(2026, 4, 20)),    # Printemps
-    (date(2026, 7, 4),   date(2026, 9, 1)),     # Été
-    # 2026-2027 — Zone A (Lyon)
-    (date(2026, 10, 17), date(2026, 11, 2)),    # Toussaint
-    (date(2026, 12, 19), date(2027, 1, 4)),     # Noël
-    (date(2027, 2, 13),  date(2027, 3, 1)),     # Hiver
-    (date(2027, 4, 10),  date(2027, 4, 26)),    # Printemps
-    (date(2027, 7, 3),   date(2027, 9, 1)),     # Été
-]
-
-# Jours fériés fixes + calcul automatique des mobiles (Pâques)
-_JOURS_FERIES_FIXES = [(1, 1), (5, 1), (5, 8), (7, 14), (8, 15), (11, 1), (11, 11), (12, 25)]
-
-
-def _easter(year: int) -> date:
-    """Calcul de Pâques — algorithme de Meeus/Jones/Butcher."""
-    a = year % 19
-    b, c = divmod(year, 100)
-    d, e = divmod(b, 4)
-    f = (b + 8) // 25
-    g = (b - f + 1) // 3
-    h = (19 * a + b - d - g + 15) % 30
-    i, k = divmod(c, 4)
-    l = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * l) // 451
-    month, day = divmod(h + l - 7 * m + 114, 31)
-    return date(year, month, day + 1)
-
-
-def _jours_feries(year: int) -> List[date]:
-    """Retourne tous les jours fériés français pour une année."""
-    fixed = [date(year, m, d) for m, d in _JOURS_FERIES_FIXES]
-    e = _easter(year)
-    mobile = [
-        e + timedelta(days=1),   # Lundi de Pâques
-        e + timedelta(days=39),  # Ascension
-        e + timedelta(days=50),  # Lundi de Pentecôte
-    ]
-    return fixed + mobile
-
-
-# Cache mémoire — rempli au démarrage depuis la DB, fallback hardcodé
-_vacances_cache: List[Tuple[date, date]] = list(_FALLBACK_VACANCES)
-_feries_cache: set = set()
-for _y in range(2025, 2028):
-    _feries_cache.update(_jours_feries(_y))
-
-
-def load_vacances_from_db() -> None:
-    """Charge les vacances depuis la table calendar_vacances (si elle existe)."""
-    global _vacances_cache
-    try:
-        from services.storage import get_vacances
-        rows = get_vacances()
-        if rows:
-            _vacances_cache = [(r["start"], r["end"]) for r in rows]
-            import logging
-            logging.getLogger("scoring").info(
-                "Calendrier scolaire chargé depuis DB : %d périodes", len(_vacances_cache)
-            )
-    except Exception:
-        pass  # fallback hardcodé
-
-
-def _is_vacances(d: date) -> bool:
-    return any(start <= d <= end for start, end in _vacances_cache)
-
-
-def _is_ferie(d: date) -> bool:
-    # Recalcul dynamique si l'année n'est pas en cache
-    if d.year not in {dd.year for dd in _feries_cache}:
-        _feries_cache.update(_jours_feries(d.year))
-    return d in _feries_cache
-
-
-def _day_type(dt: datetime) -> str:
-    """
-    Retourne le type de jour pour le profil φ :
-      'weekend'   — samedi, dimanche, jour férié
-      'vacances'  — jour de semaine en vacances scolaires (pas d'école, commuters présents)
-      'mercredi'  — mercredi hors vacances (pas d'école l'après-midi)
-      'semaine'   — lun, mar, jeu, ven hors vacances (profil standard)
-    """
-    d = dt.date() if isinstance(dt, datetime) else dt
-    dow = d.weekday()  # 0=lundi … 6=dimanche
-
-    if dow >= 5 or _is_ferie(d):
-        return "weekend"
-    if _is_vacances(d):
-        return "vacances"
-    if dow == 2:  # mercredi
-        return "mercredi"
-    return "semaine"
 
 BASELINE = {
     "traffic":   {"mu": 1.05, "sigma": 0.15},   # Criter : V≈1.0, O≈2.0, R≈2.8, N≈3.0 — recalibré auto
@@ -224,6 +123,19 @@ BASELINE = {
 # Baselines par zone — surchargent BASELINE si disponibles (calibrées depuis SQLite)
 # Structure : zone_id → signal → {mu, sigma}
 ZONE_BASELINES: Dict[str, Dict[str, Dict[str, float]]] = {}
+
+
+def set_baselines(
+    global_bl: Dict[str, Dict[str, float]],
+    zone_bl: Dict[str, Dict[str, Dict[str, float]]],
+) -> None:
+    """Met à jour BASELINE et ZONE_BASELINES depuis la calibration.
+    Seuls les signaux déjà présents dans BASELINE sont mis à jour."""
+    for sig, vals in global_bl.items():
+        if sig in BASELINE:
+            BASELINE[sig] = vals
+    ZONE_BASELINES.clear()
+    ZONE_BASELINES.update(zone_bl)
 
 
 def _effective_baseline(zone_id: str) -> Dict[str, Dict[str, float]]:
@@ -475,229 +387,220 @@ def top_causes(signals: dict, n: int = 3, bl: Dict = None) -> List[str]:
     return [f"{SIGNAL_LABELS[s]} +{v:.1f}σ" for s, v in top]
 
 
+def _load_hourly_profiles(zone_id: str, day_t: str) -> Dict[int, Dict[str, float]]:
+    """Charge les profils horaires historiques depuis la DB. Fallback vide."""
+    if not zone_id:
+        return {}
+    try:
+        from services.storage import get_hourly_signal_profiles
+        profiles = get_hourly_signal_profiles(zone_id, day_type=day_t)
+        if len(profiles) < 12:
+            profiles = get_hourly_signal_profiles(zone_id)
+        return profiles
+    except Exception:
+        return {}
+
+
+def _forecast_short_horizon(
+    h: int,
+    dt: datetime,
+    alert: float,
+    spread: float,
+    phi_now: float,
+    trend: float,
+    signals: dict,
+    incident_schedule: Dict[int, float],
+    bl: Dict,
+    hourly_profiles: Dict[int, Dict[str, float]],
+) -> dict:
+    """
+    Forecast pour un horizon court (30/60/120 min).
+    3 scénarios max-wins à partir des signaux temps réel.
+    """
+    future_dt  = dt + timedelta(minutes=h)
+    phi_future = compute_phi(future_dt)
+    decay      = math.exp(-h / 240)
+    phi_ratio  = min(phi_future / phi_now, 1.8)
+
+    if signals:
+        profile_at_h = hourly_profiles.get(future_dt.hour, {})
+
+        # 1. Persistance décayée
+        fa_persist = alert * decay * phi_ratio
+
+        # 2. Situation maintenue + phi futur
+        maintained_signals = dict(signals)
+        if phi_future > phi_now and "traffic" in maintained_signals:
+            traffic_now = maintained_signals["traffic"]
+            traffic_mu = bl["traffic"]["mu"]
+            phi_r = phi_future / phi_now
+            interp = min(max((phi_r - 1.0) * 0.6, 0.0), 0.5)
+            maintained_signals["traffic"] = traffic_now + interp * (traffic_mu - traffic_now)
+
+        for sig in ("transport",):
+            hist_val = profile_at_h.get(sig)
+            if hist_val is not None and sig in maintained_signals:
+                maintained_signals[sig] = max(maintained_signals[sig], hist_val)
+
+        risk_future = compute_risk(maintained_signals, phi_future, bl)
+        fa_maintained = (
+            LAMBDA["l1"] * risk_future
+            + LAMBDA["l2"] * compute_anomaly(maintained_signals, bl)
+            + LAMBDA["l3"] * compute_conv(maintained_signals, bl)
+        )
+
+        # 3. Projection avec incident_schedule Criter
+        fa_proj = 0.0
+        if incident_schedule and h in incident_schedule:
+            proj_signals = dict(signals)
+            proj_signals["incident"] = incident_schedule[h]
+            for sig in ("traffic", "transport"):
+                hist_val = profile_at_h.get(sig)
+                if hist_val is not None:
+                    proj_signals[sig] = max(proj_signals.get(sig, 0), hist_val)
+            fa_proj = compute_alert(
+                compute_risk(proj_signals, phi_future, bl),
+                compute_anomaly(proj_signals, bl),
+                compute_conv(proj_signals, bl),
+            )
+
+        # MAX des 3 scénarios
+        fa = max(fa_persist, fa_maintained, fa_proj)
+
+        # Tendance récente
+        trend_decay   = math.exp(-h / 60)
+        trend_contrib = max(-1.0, min(1.0, trend * h * trend_decay))
+        fa += trend_contrib * 0.3
+
+        fs = compute_urban_score(fa, spread * decay)
+
+    else:
+        # Fallback : decay + phi_ratio quand pas de signaux
+        trend_decay   = math.exp(-h / 60)
+        trend_contrib = max(-1.0, min(1.0, trend * h * trend_decay))
+
+        fa  = alert * decay * phi_ratio
+        fa += trend_contrib * 0.3
+
+        if signals and incident_schedule and h in incident_schedule:
+            incident_now  = signals.get("incident", 0.0)
+            z_inc_now     = normalize(incident_now, "incident", bl)
+            inc_alert_now = (
+                LAMBDA["l1"] * phi_now * WEIGHTS["incident"] * z_inc_now
+                + LAMBDA["l2"] * ALPHA["incident"] * max(z_inc_now, 0.0)
+            )
+            z_inc_sched = normalize(incident_schedule[h], "incident", bl)
+            inc_alert_sched = (
+                LAMBDA["l1"] * phi_future * WEIGHTS["incident"] * z_inc_sched
+                + LAMBDA["l2"] * ALPHA["incident"] * max(z_inc_sched, 0.0)
+            )
+            fa = fa - inc_alert_now * decay * phi_ratio + inc_alert_sched
+
+        fs = compute_urban_score(fa, spread * decay)
+
+    fs = max(0, min(100, fs))
+    return {
+        "horizon":     f"{h}min" if h <= 60 else f"{h // 60}h",
+        "urban_score": fs,
+        "level":       score_level(fs),
+        "phi":         round(phi_future, 2),
+        "confidence":  "high",
+    }
+
+
+def _forecast_extended_horizon(
+    h: int,
+    dt: datetime,
+    zone_id: str,
+    bl: Dict,
+    incident_schedule: Dict[int, float],
+    weather_forecast: Dict[str, float],
+) -> dict:
+    """
+    Forecast pour un horizon étendu (6h/12h/24h).
+    Modèle structurel basé sur profils historiques, météo prévue, incidents persistants.
+    """
+    future_dt   = dt + timedelta(minutes=h)
+    phi_future  = compute_phi(future_dt)
+    future_hour = future_dt.hour
+
+    # Profils historiques pour le jour futur (peut être un autre day_type)
+    ext_profiles = _load_hourly_profiles(zone_id, _day_type(future_dt))
+    profile_at_h = ext_profiles.get(future_hour, {})
+
+    # Construire les signaux structurels
+    struct_signals: Dict[str, float] = {}
+    for sig in ("traffic", "weather", "event", "transport", "incident"):
+        struct_signals[sig] = profile_at_h.get(sig, bl[sig]["mu"])
+
+    # Météo prévue remplace la moyenne historique (seul signal fiable à 6h+)
+    if weather_forecast:
+        future_local = future_dt.astimezone(LYON_TZ)
+        wf_key = future_local.strftime("%Y-%m-%dT%H:00")
+        wf_score = weather_forecast.get(wf_key)
+        if wf_score is not None:
+            struct_signals["weather"] = wf_score
+
+    # Incidents persistants (travaux avec endtime > t+h)
+    if incident_schedule and h in incident_schedule:
+        inc_val = incident_schedule[h]
+        if inc_val > 0:
+            struct_signals["incident"] = max(struct_signals["incident"], inc_val)
+
+    # L'anomaly est modulée par phi : un incident à 1h du matin
+    # a moins d'impact qu'à 8h (personne n'est impacté la nuit).
+    risk_ext    = compute_risk(struct_signals, phi_future, bl)
+    anomaly_ext = compute_anomaly(struct_signals, bl) * min(phi_future, 1.0)
+    conv_ext    = compute_conv(struct_signals, bl)
+    fa_ext      = compute_alert(risk_ext, anomaly_ext, conv_ext)
+
+    # Pas de spread à long terme (les voisins évoluent indépendamment)
+    fs_ext = max(0, min(100, compute_urban_score(fa_ext, 0.0)))
+    conf   = "medium" if h <= 720 else "low"
+
+    return {
+        "horizon":     f"{h // 60}h",
+        "urban_score": fs_ext,
+        "level":       score_level(fs_ext),
+        "phi":         round(phi_future, 2),
+        "confidence":  conf,
+    }
+
+
 def compute_forecast(
     current_score: int,
     alert: float,
     spread: float,
     dt: datetime = None,
-    trend: float = 0.0,                         # points/min
-    signals: dict = None,                        # signaux bruts — pour extraction incident
-    incident_schedule: Dict[int, float] = None,  # {30: v, 60: v, 120: v, ...} planifié
-    bl: Dict = None,                             # baseline effective de la zone
-    zone_id: str = None,                         # pour lookup profils horaires
-    weather_forecast: Dict[str, float] = None,   # {"2026-03-17T18:00": score, ...}
+    trend: float = 0.0,
+    signals: dict = None,
+    incident_schedule: Dict[int, float] = None,
+    bl: Dict = None,
+    zone_id: str = None,
+    weather_forecast: Dict[str, float] = None,
 ) -> List[dict]:
     """
     Prévision probabiliste sur horizons courts (30/60/120 min) et étendus (6/12/24h).
-
-    Horizons courts (0-2h) : 3 scénarios max-wins à partir des signaux temps réel.
-    Horizons étendus (6-24h) : modèle structurel basé sur :
-      - φ(t+h) profil temporel du jour futur
-      - profils horaires historiques (moyennes par heure/day_type)
-      - météo prévue (Open-Meteo hourly forecast)
-      - incidents persistants (travaux Criter avec endtime > t+h)
     """
     if dt is None:
         dt = datetime.now(timezone.utc)
 
     phi_now = max(compute_phi(dt), 0.1)
     _bl = bl or BASELINE
-
-    # ── Profils horaires historiques ──────────────────────────────────
-    hourly_profiles: Dict[int, Dict[str, float]] = {}
-    if zone_id:
-        try:
-            from services.storage import get_hourly_signal_profiles
-            day_t = _day_type(dt)
-            hourly_profiles = get_hourly_signal_profiles(zone_id, day_type=day_t)
-            # Fallback : si pas assez de données pour ce day_type, essayer sans filtre
-            if len(hourly_profiles) < 12:
-                hourly_profiles = get_hourly_signal_profiles(zone_id)
-        except Exception:
-            pass  # fallback : forecast classique sans projection
+    hourly_profiles = _load_hourly_profiles(zone_id, _day_type(dt))
 
     results = []
 
-    # ══════════════════════════════════════════════════════════════════
-    # HORIZONS COURTS (30/60/120 min) — signaux temps réel
-    # ══════════════════════════════════════════════════════════════════
     for h in FORECAST_HORIZONS:
-        future_dt  = dt + timedelta(minutes=h)
-        phi_future = compute_phi(future_dt)
-        future_hour = future_dt.hour
-
-        # ── Forecast à 3 scénarios (max wins) ─────────────────────────
-        #
-        # 1. Persistance décayée : alert × decay × phi_ratio
-        # 2. Situation maintenue + phi futur
-        # 3. Projection avec incident_schedule Criter
-        #
-        # On prend le MAX → le forecast reflète le pire scénario réaliste
-
-        if signals:
-            profile_at_h = hourly_profiles.get(future_hour, {})
-
-            # --- 1. Persistance décayée ---
-            phi_ratio = min(phi_future / phi_now, 1.8)
-            decay = math.exp(-h / 240)
-            fa_persist = alert * decay * phi_ratio
-
-            # --- 2. Situation maintenue + phi futur ---
-            maintained_signals = dict(signals)
-            if phi_future > phi_now and "traffic" in maintained_signals:
-                traffic_now = maintained_signals["traffic"]
-                traffic_mu = _bl["traffic"]["mu"]
-                phi_r = phi_future / phi_now
-                interp = min(max((phi_r - 1.0) * 0.6, 0.0), 0.5)
-                maintained_signals["traffic"] = traffic_now + interp * (traffic_mu - traffic_now)
-
-            for sig in ("transport",):
-                hist_val = profile_at_h.get(sig)
-                if hist_val is not None and sig in maintained_signals:
-                    maintained_signals[sig] = max(maintained_signals[sig], hist_val)
-
-            risk_future = compute_risk(maintained_signals, phi_future, _bl)
-            fa_maintained = (
-                LAMBDA["l1"] * risk_future
-                + LAMBDA["l2"] * compute_anomaly(maintained_signals, _bl)
-                + LAMBDA["l3"] * compute_conv(maintained_signals, _bl)
-            )
-
-            # --- 3. Projection avec schedule + profils historiques ---
-            fa_proj = 0.0
-            if incident_schedule and h in incident_schedule:
-                proj_signals = dict(signals)
-                proj_signals["incident"] = incident_schedule[h]
-                for sig in ("traffic", "transport"):
-                    hist_val = profile_at_h.get(sig)
-                    if hist_val is not None:
-                        proj_signals[sig] = max(proj_signals.get(sig, 0), hist_val)
-
-                risk_p  = compute_risk(proj_signals, phi_future, _bl)
-                anom_p  = compute_anomaly(proj_signals, _bl)
-                conv_p  = compute_conv(proj_signals, _bl)
-                fa_proj = compute_alert(risk_p, anom_p, conv_p)
-
-            # --- MAX des 3 scénarios ---
-            fa = max(fa_persist, fa_maintained, fa_proj)
-
-            # Tendance récente
-            trend_decay   = math.exp(-h / 60)
-            trend_contrib = max(-1.0, min(1.0, trend * h * trend_decay))
-            fa += trend_contrib * 0.3
-
-            fs = compute_urban_score(fa, spread * math.exp(-h / 240))
-
-        else:
-            # Fallback : ancien forecast (decay + phi_ratio) quand pas de profils
-            phi_ratio = min(phi_future / phi_now, 1.8)
-            decay = math.exp(-h / 240)
-
-            trend_decay   = math.exp(-h / 60)
-            trend_contrib = max(-1.0, min(1.0, trend * h * trend_decay))
-
-            fa  = alert * decay * phi_ratio
-            fa += trend_contrib * 0.3
-
-            if signals and incident_schedule and h in incident_schedule:
-                incident_now  = signals.get("incident", 0.0)
-                z_inc_now     = normalize(incident_now, "incident", _bl)
-                inc_alert_now = (
-                    LAMBDA["l1"] * phi_now * WEIGHTS["incident"] * z_inc_now
-                    + LAMBDA["l2"] * ALPHA["incident"] * max(z_inc_now, 0.0)
-                )
-                z_inc_sched = normalize(incident_schedule[h], "incident", _bl)
-                inc_alert_sched = (
-                    LAMBDA["l1"] * phi_future * WEIGHTS["incident"] * z_inc_sched
-                    + LAMBDA["l2"] * ALPHA["incident"] * max(z_inc_sched, 0.0)
-                )
-                fa = fa - inc_alert_now * decay * phi_ratio + inc_alert_sched
-
-            fs = compute_urban_score(fa, spread * math.exp(-h / 240))
-
-        fs = max(0, min(100, fs))
-
-        results.append({
-            "horizon": f"{h}min" if h <= 60 else f"{h // 60}h",
-            "urban_score": fs,
-            "level":       score_level(fs),
-            "phi":         round(phi_future, 2),
-            "confidence":  "high",
-        })
-
-    # ══════════════════════════════════════════════════════════════════
-    # HORIZONS ÉTENDUS (6h/12h/24h) — modèle structurel
-    # ══════════════════════════════════════════════════════════════════
-    # Au-delà de 2h, les signaux temps réel sont périmés.
-    # On reconstruit le score from scratch à partir de :
-    #   - φ(t+h) : profil temporel du jour futur (cross-jour correct)
-    #   - profils historiques : moyennes par heure/day_type
-    #   - météo prévue : Open-Meteo hourly (seul signal fiable à 24h)
-    #   - incidents persistants : travaux Criter encore actifs à t+h
+        results.append(_forecast_short_horizon(
+            h, dt, alert, spread, phi_now, trend,
+            signals, incident_schedule, _bl, hourly_profiles,
+        ))
 
     for h in FORECAST_HORIZONS_EXTENDED:
-        future_dt   = dt + timedelta(minutes=h)
-        phi_future  = compute_phi(future_dt)
-        future_hour = future_dt.hour
-
-        # Profils historiques pour le jour futur (peut être un autre day_type)
-        future_day_type = _day_type(future_dt)
-        ext_profiles: Dict[int, Dict[str, float]] = {}
-        if zone_id:
-            try:
-                from services.storage import get_hourly_signal_profiles
-                ext_profiles = get_hourly_signal_profiles(zone_id, day_type=future_day_type)
-                if len(ext_profiles) < 12:
-                    ext_profiles = get_hourly_signal_profiles(zone_id)
-            except Exception:
-                pass
-
-        profile_at_h = ext_profiles.get(future_hour, {})
-
-        # Construire les signaux structurels
-        struct_signals: Dict[str, float] = {}
-        for sig in ("traffic", "weather", "event", "transport", "incident"):
-            # Base : profil historique pour cette heure
-            struct_signals[sig] = profile_at_h.get(sig, _bl[sig]["mu"])
-
-        # Météo prévue remplace la moyenne historique (seul signal fiable à 6h+)
-        if weather_forecast:
-            # Clé Open-Meteo : "2026-03-17T18:00" (heure locale Europe/Paris)
-            future_local = future_dt.astimezone(LYON_TZ)
-            wf_key = future_local.strftime("%Y-%m-%dT%H:00")
-            wf_score = weather_forecast.get(wf_key)
-            if wf_score is not None:
-                struct_signals["weather"] = wf_score
-
-        # Incidents persistants (travaux avec endtime > t+h)
-        if incident_schedule and h in incident_schedule:
-            inc_val = incident_schedule[h]
-            if inc_val > 0:
-                struct_signals["incident"] = max(struct_signals["incident"], inc_val)
-
-        # Calcul du score structurel
-        # L'anomaly est modulée par phi : un incident à 1h du matin
-        # a moins d'impact qu'à 8h (personne n'est impacté la nuit).
-        risk_ext    = compute_risk(struct_signals, phi_future, _bl)
-        anomaly_raw = compute_anomaly(struct_signals, _bl)
-        anomaly_ext = anomaly_raw * min(phi_future, 1.0)
-        conv_ext    = compute_conv(struct_signals, _bl)
-        fa_ext      = compute_alert(risk_ext, anomaly_ext, conv_ext)
-
-        # Pas de spread à long terme (les voisins évoluent indépendamment)
-        fs_ext = compute_urban_score(fa_ext, 0.0)
-        fs_ext = max(0, min(100, fs_ext))
-
-        # Confidence décroît avec l'horizon
-        conf = "medium" if h <= 720 else "low"
-
-        results.append({
-            "horizon": f"{h // 60}h",
-            "urban_score": fs_ext,
-            "level":       score_level(fs_ext),
-            "phi":         round(phi_future, 2),
-            "confidence":  conf,
-        })
+        results.append(_forecast_extended_horizon(
+            h, dt, zone_id, _bl, incident_schedule, weather_forecast,
+        ))
 
     return results
 
