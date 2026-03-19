@@ -31,8 +31,10 @@ export async function fetchHealth() {
   return r.json();
 }
 
-export async function fetchSimulation(date: string) {
-  const r = await fetch(`${BASE}/zones/simulate?date=${date}`, { cache: "no-store" });
+export async function fetchSimulation(date: string, eventName?: string) {
+  const q = new URLSearchParams({ date });
+  if (eventName) q.set("event_name", eventName);
+  const r = await fetch(`${BASE}/zones/simulate?${q}`, { cache: "no-store" });
   if (!r.ok) throw new Error(`/zones/simulate ${r.status}`);
   return r.json();
 }
@@ -76,6 +78,15 @@ export async function fetchEventImpact(eventName: string) {
 export async function fetchEvents() {
   const r = await fetch(`${BASE}/reports/events`, { next: { revalidate: 3600 } });
   if (!r.ok) throw new Error(`/reports/events ${r.status}`);
+  return r.json();
+}
+
+export async function fetchPreEventReport(eventName: string, date?: string) {
+  const q = new URLSearchParams();
+  if (date) q.set("date", date);
+  const qs = q.toString() ? `?${q}` : "";
+  const r = await fetch(`${BASE}/reports/pre-event/${encodeURIComponent(eventName)}${qs}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`/reports/pre-event ${r.status}`);
   return r.json();
 }
 

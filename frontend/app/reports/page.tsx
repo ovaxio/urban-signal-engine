@@ -5,8 +5,8 @@ import AppNav from "@/components/layout/AppNav";
 import ReportViewer from "@/components/report/ReportViewer";
 
 export const metadata = {
-  title: "Rapports d'impact — Urban Signal Engine",
-  description: "Analyse post-événement de l'impact sur les zones urbaines de Lyon.",
+  title: "Rapports — Urban Signal Engine",
+  description: "Rapports pré-événement et post-événement sur les zones urbaines de Lyon.",
 };
 
 export default async function ReportsPage() {
@@ -18,7 +18,7 @@ export default async function ReportsPage() {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <AppHeader label="RAPPORTS D'IMPACT" />
+      <AppHeader label="RAPPORTS" />
       <AppNav />
 
       <main

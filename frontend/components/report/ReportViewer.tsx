@@ -1,28 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import type { CalendarEvent, ImpactReport } from "@/domain/types";
+import type { CalendarEvent, ImpactReport, PreEventReport } from "@/domain/types";
 import { scoreColor } from "@/domain/scoring";
-import { fetchEventImpact, fetchImpactReport } from "@/lib/api";
+import { fetchEventImpact, fetchImpactReport, fetchPreEventReport } from "@/lib/api";
 import ImpactReportView from "./ImpactReportView";
+import PreEventReportView from "./PreEventReportView";
 
 type Props = { events: CalendarEvent[] };
 
 export default function ReportViewer({ events }: Props) {
+  const [mode, setMode] = useState<"pre-event" | "event" | "custom">("pre-event");
+
+  // Post-event state
   const [report, setReport] = useState<ImpactReport | null>(null);
+  // Pre-event state
+  const [preReport, setPreReport] = useState<PreEventReport | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"event" | "custom">("event");
 
   // Custom period form
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  // Pre-event date form
+  const [preDate, setPreDate] = useState("");
+
+  async function loadPreEventReport(name: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const dateParam = preDate || undefined;
+      setPreReport(await fetchPreEventReport(name, dateParam));
+      setReport(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur inconnue");
+      setPreReport(null);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function loadEventReport(name: string) {
     setLoading(true);
     setError(null);
     try {
       setReport(await fetchEventImpact(name));
+      setPreReport(null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
       setReport(null);
@@ -40,6 +64,7 @@ export default function ReportViewer({ events }: Props) {
         start: `${start}T00:00:00+00:00`,
         end: `${end}T23:59:59+00:00`,
       }));
+      setPreReport(null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
       setReport(null);
@@ -48,39 +73,72 @@ export default function ReportViewer({ events }: Props) {
     }
   }
 
+  const tabs: { key: typeof mode; label: string }[] = [
+    { key: "pre-event", label: "Pré-événement" },
+    { key: "event", label: "Post-événement" },
+    { key: "custom", label: "Période libre" },
+  ];
+
   return (
     <>
       {/* Mode selector */}
       <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={() => setMode("event")}
-          style={{
-            padding: "6px 16px",
-            fontSize: 12,
-            borderRadius: 6,
-            border: "1px solid var(--border)",
-            background: mode === "event" ? "var(--accent)" : "var(--bg-card)",
-            color: mode === "event" ? "#fff" : "var(--text-secondary)",
-            cursor: "pointer",
-          }}
-        >
-          Par événement
-        </button>
-        <button
-          onClick={() => setMode("custom")}
-          style={{
-            padding: "6px 16px",
-            fontSize: 12,
-            borderRadius: 6,
-            border: "1px solid var(--border)",
-            background: mode === "custom" ? "var(--accent)" : "var(--bg-card)",
-            color: mode === "custom" ? "#fff" : "var(--text-secondary)",
-            cursor: "pointer",
-          }}
-        >
-          Période libre
-        </button>
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setMode(tab.key)}
+            style={{
+              padding: "6px 16px",
+              fontSize: 12,
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+              background: mode === tab.key ? "var(--accent)" : "var(--bg-card)",
+              color: mode === tab.key ? "#fff" : "var(--text-secondary)",
+              cursor: "pointer",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {/* Pre-event: optional date picker */}
+      {mode === "pre-event" && (
+        <div
+          style={{
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: 16,
+            display: "flex",
+            gap: 12,
+            alignItems: "flex-end",
+            flexWrap: "wrap",
+          }}
+        >
+          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+            <span style={{ color: "var(--text-secondary)", fontSize: 10, letterSpacing: "0.06em" }}>
+              DATE CIBLE (optionnel — défaut T+48h)
+            </span>
+            <input
+              type="date"
+              value={preDate}
+              onChange={(e) => setPreDate(e.target.value)}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: "var(--bg-inner)",
+                color: "var(--text-primary)",
+                fontSize: 12,
+              }}
+            />
+          </label>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", paddingBottom: 6 }}>
+            Sélectionnez un événement ci-dessous pour générer le rapport prévisionnel.
+          </div>
+        </div>
+      )}
 
       {/* Custom period form */}
       {mode === "custom" && (
@@ -152,7 +210,7 @@ export default function ReportViewer({ events }: Props) {
         </div>
       )}
 
-      {/* Loading / Error — au-dessus du contenu pour visibilité immédiate */}
+      {/* Loading / Error */}
       {loading && (
         <div
           style={{
@@ -180,11 +238,12 @@ export default function ReportViewer({ events }: Props) {
         </div>
       )}
 
-      {/* Report */}
+      {/* Reports */}
+      {preReport && !loading && <PreEventReportView report={preReport} />}
       {report && !loading && <ImpactReportView report={report} />}
 
-      {/* Event selector — en bas, après le résultat */}
-      {mode === "event" && (
+      {/* Event selector — for both pre-event and post-event modes */}
+      {(mode === "pre-event" || mode === "event") && (
         <div
           style={{
             background: "var(--bg-card)",
@@ -207,7 +266,11 @@ export default function ReportViewer({ events }: Props) {
             {events.map((ev) => (
               <button
                 key={ev.name}
-                onClick={() => loadEventReport(ev.name)}
+                onClick={() =>
+                  mode === "pre-event"
+                    ? loadPreEventReport(ev.name)
+                    : loadEventReport(ev.name)
+                }
                 disabled={loading}
                 style={{
                   display: "flex",

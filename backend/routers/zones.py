@@ -11,6 +11,7 @@ from services.scoring import compute_forecast, NEIGHBORS, ZONE_NAMES, BASELINE, 
 from services.storage import get_zone_history, get_recent_alerts
 from services.forecast_storage import save_forecast_history, get_forecast_accuracy
 from services.events import compute_event_signals, STATIC_EVENTS
+from services.simulation import simulate_event_profile
 from config import ENABLE_HISTORY, WEIGHTS
 
 log = logging.getLogger("router.zones")
@@ -188,22 +189,13 @@ def _build_sim_scores(d: date_type, date: str) -> tuple[list[dict], list[str]]:
 
 
 @router.get("/simulate")
-async def simulate_date(date: str = Query(..., description="YYYY-MM-DD")):
-    """Simule les scores de toutes les zones pour une date donnée."""
+async def simulate_date(
+    date: str = Query(..., description="YYYY-MM-DD"),
+    event_name: Optional[str] = Query(None, description="Nom événement (recherche partielle)"),
+):
+    """Simule le profil horaire 24h (6h-23h) pour toutes les zones à une date donnée."""
     d = _parse_sim_date(date)
-    scores, active_events = _build_sim_scores(d, date)
-    clean = sorted(
-        [{k: v for k, v in z.items() if k != "alert"} for z in scores],
-        key=lambda z: z["urban_score"],
-        reverse=True,
-    )
-    return {
-        "mode":          "simulation",
-        "date":          date,
-        "active_events": active_events,
-        "count":         len(clean),
-        "zones":         clean,
-    }
+    return await simulate_event_profile(d, event_name)
 
 
 @router.get("/{zone_id}/simulate-detail")
@@ -211,6 +203,7 @@ async def simulate_zone_detail(zone_id: str, date: str = Query(..., description=
     """
     Retourne le détail simulé d'une zone pour une date donnée.
     Même structure que /zones/{id}/detail avec champs sim_date et sim_events en plus.
+    Utilise _build_sim_scores (score unique 11h) pour compatibilité existante.
     """
     d = _parse_sim_date(date)
     scores, active_events = _build_sim_scores(d, date)

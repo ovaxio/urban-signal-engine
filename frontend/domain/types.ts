@@ -189,3 +189,120 @@ export type ForecastAccuracy = {
   by_horizon: ForecastAccuracyHorizon[];
   recent: ForecastEvaluation[];
 };
+
+// ── Simulation 24h ──────────────────────────────────────────────────────────
+
+export type SimulateZoneHourly = {
+  hour: number;
+  score: number;
+  level: string;
+  signals: {
+    traffic: number;
+    weather: number;
+    transport: number;
+    event: number;
+    incident: number;
+  };
+};
+
+export type RiskWindow = {
+  from: number;
+  to: number;
+  level: string;
+  peak_score: number;
+  main_signal: string;
+};
+
+export type SimulateZone = {
+  hourly: SimulateZoneHourly[];
+  peak_hour: number;
+  peak_score: number;
+  peak_level: string;
+  risk_windows: RiskWindow[];
+};
+
+export type SimulateWeatherHour = {
+  temp: number;
+  precip_mm: number;
+  wind_kmh: number;
+};
+
+export type SimulateResponse = {
+  date: string;
+  event_name: string | null;
+  event_meta: {
+    name: string;
+    zone: string;
+    zone_name: string;
+    weight: number;
+    dates: string[];
+  } | null;
+  active_events: string[];
+  zones: Record<string, SimulateZone>;
+  weather_forecast: {
+    source: string;
+    fetched_at: string;
+    hourly: Record<string, SimulateWeatherHour>;
+  };
+  weather_context: {
+    summary: string;
+    risk_modifier: string;
+  };
+  generated_at: string;
+};
+
+// ── Pre-Event Report ────────────────────────────────────────────────────────
+
+export type ReportRecommendation = {
+  level: number;
+  text: string;
+};
+
+export type RiskWindowSummary = {
+  zone: string;
+  zone_name: string;
+  from: number;
+  to: number;
+  level: string;
+  peak_score: number;
+  main_signal: string;
+  recommendation: string;
+};
+
+export type SignalsBreakdown = {
+  dominant_signal: string;
+  traffic_zscore: number;
+  weather_zscore: number;
+  transport_zscore: number;
+  event_zscore: number;
+  incident_zscore: number;
+};
+
+export type PreEventReport = {
+  report_type: "pre_event";
+  event: {
+    name: string;
+    date: string;
+    primary_zones: string[];
+    zone_names: Record<string, string>;
+    weight: number;
+  };
+  generated_at: string;
+  simulation_horizon_h: number;
+  executive_summary: {
+    overall_risk: string;
+    overall_peak_score: number;
+    critical_zones: string[];
+    peak_window: { from: number; to: number };
+    recommendation_level: number;
+  };
+  zones_analysis: Record<string, SimulateZone>;
+  risk_windows_summary: RiskWindowSummary[];
+  recommendations: ReportRecommendation[];
+  weather_context: {
+    summary: string;
+    risk_modifier: string;
+  };
+  signals_breakdown: Record<string, SignalsBreakdown>;
+  data_confidence: "high" | "medium" | "low";
+};

@@ -27,12 +27,17 @@ def _days(start: str, end: str) -> List[date]:
 # ──────────────────────────────────────────────
 STATIC_EVENTS: List[dict] = [
     # --- Q1 ---
+    # hours = (start_hour, end_hour) — créneau d'activité de l'événement.
+    # Utilisé par la simulation pré-événement (pas le scoring live).
+    # ramp = heures d'arrivée/départ autour du créneau (afflux transport).
     {
         "name":   "Foire de Lyon (Eurexpo)",
         "dates":  _days("2026-03-20", "2026-03-30"),
         "zone":   "villette",       # Eurexpo → zone villette/est
         "lat":    45.7310, "lng": 4.9220,
         "weight": 1.5,
+        "hours":  (9, 19),          # salon pro/public journée
+        "ramp":   2,
     },
     {
         "name":   "Lyon Urban Trail",
@@ -40,6 +45,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "fourviere",
         "lat":    45.7600, "lng": 4.8200,
         "weight": 1.2,
+        "hours":  (7, 14),          # départ 8h, arrivées jusqu'à 14h
+        "ramp":   1,
     },
     # --- Q2 ---
     {
@@ -48,6 +55,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "presquile",
         "lat":    45.7560, "lng": 4.8320,
         "weight": 0.8,
+        "hours":  (10, 22),         # festival littéraire journée + soirée
+        "ramp":   1,
     },
     {
         "name":   "Nuits Sonores",
@@ -55,6 +64,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "confluence",
         "lat":    45.7380, "lng": 4.8170,
         "weight": 1.0,
+        "hours":  (18, 23),         # festival nocturne (continue après 23h mais hors sim)
+        "ramp":   2,
     },
     {
         "name":   "Les Intergalactiques",
@@ -62,6 +73,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "part-dieu",
         "lat":    45.7600, "lng": 4.8600,
         "weight": 0.8,
+        "hours":  (14, 22),         # convention SF après-midi + soirée
+        "ramp":   1,
     },
     {
         "name":   "Fête de la Musique",
@@ -69,6 +82,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "presquile",
         "lat":    45.7600, "lng": 4.8350,
         "weight": 1.0,
+        "hours":  (17, 23),         # concerts en plein air fin d'après-midi → nuit
+        "ramp":   1,
     },
     {
         "name":   "Lyon Street Food Festival",
@@ -76,6 +91,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "gerland",
         "lat":    45.7330, "lng": 4.8330,
         "weight": 0.8,
+        "hours":  (11, 23),         # food festival midi → soirée
+        "ramp":   1,
     },
     # --- Q3 ---
     {
@@ -84,6 +101,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "fourviere",
         "lat":    45.7622, "lng": 4.8200,
         "weight": 0.5,    # impact quotidien modéré, boost les soirs de gros concerts
+        "hours":  (20, 23),         # spectacles en soirée
+        "ramp":   2,
     },
     {
         "name":   "Biennale de la Danse / d'Art Contemporain",
@@ -91,6 +110,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "presquile",
         "lat":    45.7560, "lng": 4.8320,
         "weight": 1.0,
+        "hours":  (14, 22),         # représentations après-midi + soirée
+        "ramp":   1,
     },
     # --- Q4 ---
     {
@@ -99,6 +120,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "gerland",
         "lat":    45.7330, "lng": 4.8330,
         "weight": 1.2,
+        "hours":  (7, 14),          # course matin, fermetures de route
+        "ramp":   1,
     },
     {
         "name":   "Festival Lumière",
@@ -106,6 +129,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "part-dieu",
         "lat":    45.7600, "lng": 4.8600,
         "weight": 1.2,
+        "hours":  (10, 23),         # séances cinéma toute la journée
+        "ramp":   1,
     },
     {
         "name":   "Equita Lyon (Eurexpo)",
@@ -113,6 +138,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "villette",
         "lat":    45.7310, "lng": 4.9220,
         "weight": 1.2,
+        "hours":  (9, 19),          # salon équestre journée
+        "ramp":   2,
     },
     # Fête des Lumières — ~2M visiteurs sur 4 nuits, Lyon paralysée
     # Sites principaux : poids 0.7 (épicentres CRITIQUE)
@@ -123,6 +150,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "presquile",
         "lat":    45.7580, "lng": 4.8330,
         "weight": 0.7,
+        "hours":  (18, 23),         # illuminations nocturnes
+        "ramp":   2,
     },
     {
         "name":   "Fête des Lumières — Fourvière",
@@ -130,6 +159,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "fourviere",
         "lat":    45.7622, "lng": 4.8200,
         "weight": 0.7,
+        "hours":  (18, 23),
+        "ramp":   2,
     },
     {
         "name":   "Fête des Lumières — Vieux Lyon",
@@ -137,6 +168,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "vieux-lyon",
         "lat":    45.7622, "lng": 4.8271,
         "weight": 0.7,
+        "hours":  (18, 23),
+        "ramp":   2,
     },
     {
         "name":   "Fête des Lumières — Croix-Rousse",
@@ -144,6 +177,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "croix-rousse",
         "lat":    45.7760, "lng": 4.8320,
         "weight": 0.7,
+        "hours":  (18, 23),
+        "ramp":   2,
     },
     {
         "name":   "Fête des Lumières — Parc de la Tête d'Or",
@@ -151,6 +186,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "brotteaux",
         "lat":    45.7720, "lng": 4.8570,   # entrée sud du parc, dans le rayon Brotteaux
         "weight": 0.7,
+        "hours":  (18, 23),
+        "ramp":   2,
     },
     {
         "name":   "Fête des Lumières — Gare Part-Dieu (accès)",
@@ -158,6 +195,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "part-dieu",
         "lat":    45.7605, "lng": 4.8597,
         "weight": 0.3,
+        "hours":  (16, 23),         # afflux gare dès 16h
+        "ramp":   2,
     },
     {
         "name":   "Fête des Lumières — Gare Perrache (accès)",
@@ -165,6 +204,8 @@ STATIC_EVENTS: List[dict] = [
         "zone":   "perrache",
         "lat":    45.7488, "lng": 4.8286,
         "weight": 0.3,
+        "hours":  (16, 23),         # afflux gare dès 16h
+        "ramp":   2,
     },
 ]
 
