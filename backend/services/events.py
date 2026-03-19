@@ -48,6 +48,36 @@ STATIC_EVENTS: List[dict] = [
         "hours":  (7, 16),          # premier départ 7h (38km), arrivées jusqu'à ~16h
         "ramp":   1,
     },
+    # --- OL Ligue 1 (Groupama Stadium, Décines) ---
+    # Impact principal = transit Part-Dieu (T3 tram, gare TGV) + afflux centre-ville.
+    # 55 000 spectateurs → saturation T3, bouchons A43/Bd périph, bars Presqu'île.
+    {
+        "name":   "OL — PSG (Ligue 1, Groupama Stadium)",
+        "dates":  [date(2026, 4, 5)],
+        "zone":   "part-dieu",
+        "lat":    45.7605, "lng": 4.8597,   # Gare Part-Dieu (hub transit vers Décines)
+        "weight": 1.8,                       # affiche majeure, 55k+ spectateurs
+        "hours":  (21, 23),                  # coup d'envoi 21h00
+        "ramp":   3,                         # fans arrivent dès 18h, départ jusqu'à 00h
+    },
+    {
+        "name":   "OL — OM (Ligue 1, Groupama Stadium)",
+        "dates":  [date(2026, 5, 10)],
+        "zone":   "part-dieu",
+        "lat":    45.7605, "lng": 4.8597,
+        "weight": 1.8,
+        "hours":  (15, 17),                  # coup d'envoi 15h00
+        "ramp":   3,
+    },
+    {
+        "name":   "OL — Saint-Étienne (Derby, Groupama Stadium)",
+        "dates":  [date(2026, 3, 22)],
+        "zone":   "part-dieu",
+        "lat":    45.7605, "lng": 4.8597,
+        "weight": 2.0,                       # derby = tension maximale
+        "hours":  (17, 19),                  # coup d'envoi 17h00
+        "ramp":   3,
+    },
     # --- Q2 ---
     {
         "name":   "Quais du Polar",

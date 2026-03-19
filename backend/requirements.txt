@@ -5,3 +5,4 @@ pydantic[email]==2.11.1
 python-dotenv==1.0.1
 slowapi==0.1.9
 sentry-sdk[fastapi]==2.20.0
+fpdf2==2.8.2

@@ -5,6 +5,7 @@ Endpoints :
     GET /reports/impact?start=...&end=...             — post-event (période libre)
     GET /reports/impact/event/{event_name}             — post-event (calendrier)
     GET /reports/pre-event/{event_name}?date=...       — pré-événement (simulation 24h)
+    GET /reports/pre-event/{event_name}/pdf?date=...   — pré-événement PDF
     GET /reports/events                                — liste événements disponibles
 """
 
@@ -15,6 +16,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
 
 from services.events import STATIC_EVENTS, _days
 from services.scoring import ZONE_NAMES, SIGNAL_LABELS, NEIGHBORS, score_level
@@ -565,3 +567,30 @@ async def pre_event_report(
         "data_confidence": confidence,
         "next_update": f"Rapport actualisé disponible à J-1 ({(target_date - timedelta(days=1)).isoformat()}).",
     }
+
+
+@router.get("/pre-event/{event_name}/pdf")
+async def pre_event_pdf(
+    event_name: str,
+    date: Optional[str] = Query(None, description="Date cible YYYY-MM-DD"),
+):
+    """
+    Rapport pré-événement au format PDF.
+    Même données que /pre-event/{event_name} mais rendu en document PDF.
+    """
+    # Reuse the JSON report logic
+    report = await pre_event_report(event_name, date)
+
+    from services.pdf_report import generate_pre_event_pdf
+    pdf_bytes = generate_pre_event_pdf(report)
+
+    # Build filename
+    safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", event_name)[:40]
+    target = report["event"]["date"]
+    filename = f"USE_PreEvent_{safe_name}_{target}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
