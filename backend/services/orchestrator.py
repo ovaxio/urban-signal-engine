@@ -19,6 +19,7 @@ from services.scoring import (
 from services.storage import save_scores_history
 from services.forecast_storage import (
     save_forecast_history, evaluate_forecasts, flag_incident_surprises,
+    should_save_forecasts,
 )
 from services.alerts import check_alerts, dispatch_alerts
 
@@ -71,7 +72,7 @@ async def refresh_scores(force: bool = False) -> List[dict]:
             flag_incident_surprises(incident_events)
 
             # Sauvegarder les forecasts pour TOUTES les zones (accuracy tracking)
-            if ENABLE_HISTORY:
+            if ENABLE_HISTORY and should_save_forecasts():
                 for z in scores:
                     zid = z["zone_id"]
                     trend = compute_trend(zid, z["urban_score"])

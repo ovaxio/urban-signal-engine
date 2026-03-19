@@ -38,6 +38,14 @@ def _horizon_to_minutes(horizon: str) -> Optional[int]:
 
 # ─── Save ─────────────────────────────────────────────────────────────────────
 
+def should_save_forecasts() -> bool:
+    """Vérifie si le throttle autorise une nouvelle sauvegarde batch."""
+    now = datetime.now(timezone.utc)
+    if _last_forecast_save and (now - _last_forecast_save).total_seconds() < FORECAST_SAVE_INTERVAL:
+        return False
+    return True
+
+
 def save_forecast_history(
     zone_id: str,
     forecast: List[Dict[str, Any]],
@@ -46,12 +54,10 @@ def save_forecast_history(
 ) -> int:
     """
     Persiste les prévisions d'une zone pour évaluation ultérieure.
-    Throttlé à FORECAST_SAVE_INTERVAL pour éviter le bloat.
+    Le throttle est géré par l'appelant via should_save_forecasts().
     """
     global _last_forecast_save
     now = datetime.now(timezone.utc)
-    if _last_forecast_save and (now - _last_forecast_save).total_seconds() < FORECAST_SAVE_INTERVAL:
-        return 0
 
     ts_now = now.isoformat(timespec="seconds")
     rows = []
