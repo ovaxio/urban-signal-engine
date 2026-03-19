@@ -1,3 +1,5 @@
+Read CLAUDE.md and docs/decisions/README.md before starting any task.
+
 # Urban Signal Engine — CLAUDE.md
 
 ## Project overview
@@ -215,6 +217,208 @@ Do NOT suggest migrating to Postgres before first paying customer.
 4. seed_history.py → read fully before modifying
 5. Any new dependency → justify first
 
+## Decision log
+
+Decisions are in `docs/decisions/`. Read the relevant ADR before modifying any component listed in its Triggers section.
+
+| ADR | Title | Triggers |
+|-----|-------|----------|
+| 001 | Transport signal inversion | ingestion.py, passages_tcl, calibration |
+| 002 | Signal weights | WEIGHTS constant, scoring weights |
+| 003 | Learning + calibration | storage.py calibration, smoothing.py |
+| 004 | GTM + commercial | pricing, segments, landing page copy |
+| 005 | Product architecture MVP | dependencies, infra, new signal sources |
+
 ## Target market (context for naming/comments)
-Primary: événementiel / logistique urbaine Lyon (POC payant par événement)
-Secondary: sécurité privée (pilote 30j gratuit → 299-499€/mois)
+Primary: sécurité privée / événementielle Lyon (rapport événement 390€ HT one-shot → abonnement 490€/mois)
+Secondary: logistique / livraison (API 149€/mois, starts week 6+ only)
+
+## ADR generation — standing instruction
+
+This instruction is permanent and applies to every session.
+You must detect when a decision warrants an ADR and create it without
+being asked.
+
+---
+
+## When to create an ADR (trigger conditions)
+
+Create an ADR automatically when ANY of these occur during a session:
+
+### Technical triggers
+- A constant, weight, threshold, or formula is changed and the reason
+  is non-obvious (would need re-explaining in a future session)
+- A new external dependency or data source is added or explicitly rejected
+- A database schema change affects data semantics (not just adding a column)
+- A signal composition or scoring logic change is made
+- A bug fix changes a behavior that was previously intentional
+- An architectural pattern is chosen over a documented alternative
+- A performance or reliability constraint is discovered and worked around
+
+### Product/strategy triggers
+- A segment, feature, or integration is explicitly ruled out
+  (NO-GO decisions are as important as GO decisions)
+- A pricing, packaging, or commercial decision is made or confirmed
+- A pivot condition or fallback strategy is defined
+- A "do not build before X" constraint is established
+
+### Process triggers
+- A recurring mistake is identified and a prevention rule is established
+- A known issue is documented as "won't fix until Y"
+- An external API or service is evaluated and rejected with a reason
+
+---
+
+## When NOT to create an ADR
+
+- Routine implementation (adding an endpoint that follows existing patterns)
+- Bug fixes that restore intended behavior without changing the design
+- Style, naming, or formatting changes
+- Temporary workarounds explicitly marked as TODO
+- Changes already covered by an existing ADR (update the existing one instead)
+
+---
+
+## Decision detection protocol
+
+After completing any task, run this internal check silently:
+
+1. Did I change a value that another developer (or future Claude session)
+   might change back without knowing why? → ADR needed
+2. Did I reject an approach that seems reasonable on the surface? → ADR needed
+3. Did I establish a rule or constraint that isn't in the code itself? → ADR needed
+4. Did I discover a non-obvious limitation of an external system? → ADR needed
+5. Is this decision covered by an existing ADR? → Update that ADR instead
+
+If any answer is YES → create or update the ADR before ending the session.
+
+---
+
+## ADR format (strict — do not deviate)
+
+File: docs/decisions/ADR-{NNN}-{kebab-case-title}.md
+Number: increment from highest existing ADR number in docs/decisions/
+```markdown
+# ADR-{NNN} — {Title}
+
+**Date**: {today}
+**Status**: Accepted
+**Source**: Claude Code session — {brief task description}
+
+## Decision
+{One or two lines maximum — the exact decision made}
+
+## Values
+{Constants, parameters, thresholds, or rules — as code block or bullets}
+
+## Rationale
+- {Non-obvious reason 1}
+- {Non-obvious reason 2}
+- {Non-obvious reason 3 if needed}
+
+## Consequences
+- {What is now true}
+- {What changed}
+- {Side effect if any}
+
+## DO NOT
+- {Explicit prohibition 1 — derived from a real risk or past mistake}
+- {Explicit prohibition 2}
+- {Explicit prohibition 3 if needed}
+
+## Triggers
+Re-read when: {comma-separated list of files, functions, or topics}
+```
+
+Hard constraints on format:
+- Max 30 lines total
+- No prose paragraphs — bullets and short statements only
+- Every line carries information — no filler
+- DO NOT section is mandatory — minimum 2 items
+- Triggers section is mandatory
+
+---
+
+## ADR lifecycle rules
+
+### Creating a new ADR
+- Check docs/decisions/ for existing ADRs that might already cover this
+- Use the next available number (grep existing files for highest N)
+- Create the file immediately — do not defer to end of session
+- Show the created ADR content in your response
+
+### Updating an existing ADR
+- If a decision supersedes or refines an existing ADR:
+  - Update Status to "Superseded by ADR-{N}" or "Updated {date}"
+  - Add an "## Update {date}" section at the bottom with the change
+  - Do NOT rewrite history — append only
+
+### Conflicting decisions
+- If a new decision contradicts an existing ADR:
+  - Flag it explicitly: "⚠️ This conflicts with ADR-{N}"
+  - Do not silently override — ask for confirmation before creating
+
+---
+
+## README.md maintenance
+
+After creating or updating any ADR, update docs/decisions/README.md:
+
+The README must always contain:
+- A table with: N, Title, Status, Date, Triggers (one-line summary)
+- Sorted by ADR number ascending
+- Note at top: "Read relevant ADR before modifying any Triggers component"
+
+Update CLAUDE.md decision log table to match.
+
+---
+
+## Response format when creating an ADR
+
+When you create an ADR during a session, include this block
+at the END of your normal response (after the task output):
+
+---
+📋 ADR created: ADR-{NNN} — {Title}
+Reason: {one sentence — why this decision warrants an ADR}
+File: docs/decisions/ADR-{NNN}-{kebab-case-title}.md
+---
+
+Do not interrupt the task flow to announce ADR creation.
+Create the file, then append the block above at the very end.
+If multiple ADRs are created in one session, list them all at the end.
+
+---
+
+## Verification at session end
+
+Before ending any session where code was changed, run silently:
+
+ls docs/decisions/ | wc -l
+
+Compare to session start count.
+If count is the same and any trigger condition was met → create the missing ADR.
+If count increased → confirm README.md and CLAUDE.md are updated.
+
+---
+
+## Example — correct behavior
+
+Task: "Fix the incident_surprise flag — it was never being set to 1"
+
+After fixing:
+Claude detects: "This bug fix changed a behavior. The old behavior was
+unintentional (broken starttime field), the new behavior is intentional
+(raw_incident lookup). A future session might revert this thinking the
+new code is wrong."
+
+Claude creates ADR-006 automatically, appends the 📋 block at end of response.
+
+---
+
+## Example — incorrect behavior
+
+Task: "Add a loading spinner to the dashboard"
+
+Claude does NOT create an ADR.
+Reason: routine UI implementation, no decision with future re-interpretation risk.
