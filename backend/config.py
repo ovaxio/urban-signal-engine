@@ -132,7 +132,7 @@ ZONE_CENTROIDS = {
     "brotteaux":    (45.7690, 4.8560),
     "villette":     (45.7720, 4.8620),
     "montchat":     (45.7560, 4.8760),
-    "fourviere":    (45.7622, 4.8200),
+    "fourviere":    (45.7622, 4.8150),
     "croix-rousse": (45.7760, 4.8320),
-    "confluence":   (45.7380, 4.8170),
+    "confluence":   (45.7400, 4.8200),
 }
