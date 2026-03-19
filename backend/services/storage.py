@@ -8,7 +8,7 @@ import gzip
 import sqlite3
 import logging
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).parent.parent / "data" / "urban_signal.db"
 SEED_PATH = Path(__file__).parent.parent / "data" / "seed_signals_history.csv.gz"
+
+# Transport signal inverted around this date (old activity model → disruption model).
+# Data before this timestamp uses the pre-inversion transport values.
+# Adjust if inversion was deployed at a different time.
+CALIBRATION_CUTOFF_TS = "2026-03-15T00:00:00"
 
 CREATE_SIGNALS_HISTORY = """
 CREATE TABLE IF NOT EXISTS signals_history (
@@ -76,6 +81,22 @@ CREATE TABLE IF NOT EXISTS forecast_history (
 );
 """
 
+CREATE_CALIBRATION_LOG = """
+CREATE TABLE IF NOT EXISTS calibration_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    calibrated_at   TEXT    NOT NULL,
+    zone_id         TEXT,
+    signal          TEXT    NOT NULL,
+    old_mu          REAL,
+    new_mu          REAL,
+    old_sigma       REAL,
+    new_sigma       REAL,
+    row_count       INTEGER NOT NULL,
+    cutoff_ts       TEXT    NOT NULL,
+    skipped         INTEGER DEFAULT 0
+);
+"""
+
 CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_sh_zone_ts  ON signals_history (zone_id, ts);",
     "CREATE INDEX IF NOT EXISTS idx_sh_ts       ON signals_history (ts);",
@@ -110,6 +131,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
         conn.execute(CREATE_VACANCES)
         conn.execute(CREATE_FORECAST_HISTORY)
         conn.execute(CREATE_CONTACT)
+        conn.execute(CREATE_CALIBRATION_LOG)
         for idx_sql in CREATE_INDEXES:
             conn.execute(idx_sql)
         _migrate_raw_columns(conn)
@@ -370,22 +392,28 @@ def get_signal_stats(
 def get_calibration_baselines(
     min_count: int = 96,
     db_path: Path = DB_PATH,
-) -> Optional[Dict[str, Dict[str, float]]]:
+) -> tuple[Optional[Dict[str, Dict[str, float]]], int]:
     """
     Calcule les baselines globales (toutes zones) depuis les raw_signals.
-    Retourne None si pas assez de données (< min_count relevés).
-    Utilisé par scoring.py pour recalibrer BASELINE automatiquement.
+    Retourne (None, n) si pas assez de données (< min_count relevés).
+    Retourne (baselines, n) sinon.
+    Filtre : source='live' uniquement, ts >= CALIBRATION_CUTOFF_TS.
     """
-    sql = """
-        SELECT COUNT(*) as n FROM signals_history WHERE raw_traffic IS NOT NULL
+    _cal_where = "AND source = 'live' AND ts >= ?"
+    _cal_params: list = [CALIBRATION_CUTOFF_TS]
+
+    sql = f"""
+        SELECT COUNT(*) as n FROM signals_history
+        WHERE raw_traffic IS NOT NULL {_cal_where}
     """
     with _get_conn(db_path) as conn:
         conn.row_factory = sqlite3.Row
-        n = conn.execute(sql).fetchone()["n"]
+        n = conn.execute(sql, _cal_params).fetchone()["n"]
 
     if n < min_count:
-        logger.info("Recalibration différée : %d/%d relevés raw disponibles.", n, min_count)
-        return None
+        logger.info("Recalibration différée : %d/%d relevés qualifiés (cutoff=%s).",
+                     n, min_count, CALIBRATION_CUTOFF_TS)
+        return None, n
 
     # Sigma minimum physiquement raisonnable par signal.
     # Évite qu'un historique quasi-constant (ex: event=0.0 toujours) produise
@@ -404,16 +432,22 @@ def get_calibration_baselines(
         col = f"raw_{signal}"
         sql = f"""
             SELECT
+                COUNT({col})                                      AS cnt,
                 AVG({col})                                        AS mu,
                 AVG({col} * {col}) - AVG({col}) * AVG({col})     AS variance
             FROM signals_history
-            WHERE {col} IS NOT NULL
+            WHERE {col} IS NOT NULL {_cal_where}
         """
         with _get_conn(db_path) as conn:
             conn.row_factory = sqlite3.Row
-            row = conn.execute(sql).fetchone()
+            row = conn.execute(sql, _cal_params).fetchone()
 
-        if row and row["mu"] is not None:
+        if not row or row["cnt"] < 50:
+            logger.warning("Calibration skip signal=%s — seulement %d relevés qualifiés.",
+                           signal, row["cnt"] if row else 0)
+            continue
+
+        if row["mu"] is not None:
             variance = max(row["variance"] or 0.0, 0.0)
             sigma    = max(variance ** 0.5, MIN_SIGMA[signal])
             baselines[signal] = {
@@ -421,8 +455,9 @@ def get_calibration_baselines(
                 "sigma": round(sigma, 4),
             }
 
-    logger.info("Baselines recalibrées depuis %d relevés : %s", n, baselines)
-    return baselines if baselines else None
+    logger.info("Baselines recalibrées depuis %d relevés (cutoff=%s) : %s",
+                n, CALIBRATION_CUTOFF_TS, baselines)
+    return (baselines if baselines else None), n
 
 
 def get_calibration_baselines_per_zone(
@@ -434,6 +469,7 @@ def get_calibration_baselines_per_zone(
     Retourne un dict zone_id → signal → {mu, sigma}.
     Les zones avec moins de min_count relevés sont ignorées (baseline globale utilisée).
     Le signal event est exclu (historique non-stationnaire).
+    Filtre : source='live' uniquement, ts >= CALIBRATION_CUTOFF_TS.
     """
     MIN_SIGMA = {
         "traffic":   0.15,
@@ -442,7 +478,10 @@ def get_calibration_baselines_per_zone(
         "incident":  0.15,
     }
 
-    sql = """
+    _cal_where = "AND source = 'live' AND ts >= ?"
+    _cal_params: list = [CALIBRATION_CUTOFF_TS]
+
+    sql = f"""
         SELECT
             zone_id,
             COUNT(raw_traffic)                                                AS n,
@@ -455,14 +494,14 @@ def get_calibration_baselines_per_zone(
             AVG(raw_incident)                                                 AS mu_incident,
             AVG(raw_incident*raw_incident) - AVG(raw_incident)*AVG(raw_incident)     AS var_incident
         FROM signals_history
-        WHERE raw_traffic IS NOT NULL
+        WHERE raw_traffic IS NOT NULL {_cal_where}
         GROUP BY zone_id
     """
 
     result: Dict[str, Dict[str, Dict[str, float]]] = {}
     with _get_conn(db_path) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute(sql).fetchall()
+        rows = conn.execute(sql, _cal_params).fetchall()
 
     for row in rows:
         if row["n"] < min_count:
@@ -484,6 +523,87 @@ def get_calibration_baselines_per_zone(
         len(result), min_count,
     )
     return result
+
+
+# ─── Calibration Log ─────────────────────────────────────────────────────────
+
+def save_calibration_log(
+    entries: List[Dict[str, Any]],
+    db_path: Path = DB_PATH,
+) -> int:
+    """
+    Persiste les résultats d'une calibration dans calibration_log.
+    Chaque entry : {zone_id, signal, old_mu, new_mu, old_sigma, new_sigma,
+                    row_count, cutoff_ts, skipped}.
+    """
+    if not entries:
+        return 0
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    sql = """
+        INSERT INTO calibration_log
+            (calibrated_at, zone_id, signal, old_mu, new_mu,
+             old_sigma, new_sigma, row_count, cutoff_ts, skipped)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    rows = [
+        (now, e.get("zone_id"), e["signal"],
+         e.get("old_mu"), e.get("new_mu"),
+         e.get("old_sigma"), e.get("new_sigma"),
+         e["row_count"], e["cutoff_ts"], int(e.get("skipped", 0)))
+        for e in entries
+    ]
+    with _get_conn(db_path) as conn:
+        conn.executemany(sql, rows)
+    logger.info("calibration_log : %d entrée(s) insérée(s).", len(rows))
+    return len(rows)
+
+
+def get_calibration_log(
+    limit: int = 50,
+    db_path: Path = DB_PATH,
+) -> List[Dict[str, Any]]:
+    """Retourne les dernières entrées du calibration_log."""
+    sql = """
+        SELECT calibrated_at, zone_id, signal,
+               old_mu, new_mu, old_sigma, new_sigma,
+               row_count, cutoff_ts, skipped
+        FROM calibration_log
+        ORDER BY id DESC
+        LIMIT ?
+    """
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ─── Raw incident lookup ─────────────────────────────────────────────────────
+
+def get_raw_incident_at(
+    zone_id: str,
+    ts: str,
+    tolerance_minutes: int = 5,
+    db_path: Path = DB_PATH,
+) -> float:
+    """
+    Retourne la valeur raw_incident la plus proche de `ts` (±tolerance).
+    Retourne 0.0 si aucun relevé trouvé.
+    """
+    ts_dt = datetime.fromisoformat(ts)
+    window_start = (ts_dt - timedelta(minutes=tolerance_minutes)).isoformat(timespec="seconds")
+    window_end = (ts_dt + timedelta(minutes=tolerance_minutes)).isoformat(timespec="seconds")
+    sql = """
+        SELECT raw_incident
+        FROM signals_history
+        WHERE zone_id = ? AND ts >= ? AND ts <= ?
+          AND raw_incident IS NOT NULL
+        ORDER BY ABS(julianday(ts) - julianday(?))
+        LIMIT 1
+    """
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(sql, (zone_id, window_start, window_end, ts)).fetchone()
+    return float(row["raw_incident"]) if row else 0.0
 
 
 # ─── Impact Report ────────────────────────────────────────────────────────────

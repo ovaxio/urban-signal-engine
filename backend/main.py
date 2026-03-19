@@ -31,12 +31,21 @@ from routers.contact import router as contact_router
 from routers.admin import router as admin_router
 from routers.reports import router as reports_router
 from config import CACHE_TTL_SECONDS
-from services.storage import init_db, get_calibration_baselines, get_calibration_baselines_per_zone
+from services.storage import (
+    init_db, get_calibration_baselines, get_calibration_baselines_per_zone,
+    save_calibration_log, CALIBRATION_CUTOFF_TS,
+)
 from services.auth import init_auth_db
 import services.scoring as scoring
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("main")
+
+_calibration_meta: dict = {
+    "last_calibrated_at": None,
+    "row_count": None,
+    "zones_calibrated": 0,
+}
 
 # ── Rate limiter ──────────────────────────────────────────────────────────────
 _rate_limit = os.getenv("RATE_LIMIT", "30/minute")
@@ -89,28 +98,56 @@ def _apply_calibration(min_count: int = 96) -> None:
     Recalibre scoring.BASELINE depuis les raw_signals en base.
     event est exclu (non-stationnaire). traffic, weather, transport,
     incident sont calibrés automatiquement depuis l'historique Criter.
+    Filtre : source='live', ts >= CALIBRATION_CUTOFF_TS.
     Appelé au démarrage et toutes les 7 jours à 3h00.
     """
+    from datetime import datetime, timezone as _tz
+
+    cal_entries: list = []
     global_bl = {"event": _EVENT_BASELINE_DEFAULT.copy()}
 
-    baselines = get_calibration_baselines(min_count=min_count)
+    baselines, n_rows = get_calibration_baselines(min_count=min_count)
     if not baselines:
-        log.info("Recalibration : données insuffisantes, baselines conservées.")
+        log.info("Recalibration : données insuffisantes (%d relevés qualifiés), baselines conservées.", n_rows)
     else:
         for signal, values in baselines.items():
             old = scoring.BASELINE.get(signal, {})
             global_bl[signal] = values
+            delta_pct = (
+                abs(values["mu"] - old.get("mu", 0)) / max(old.get("mu", 1), 0.01) * 100
+                if old.get("mu") is not None else 0
+            )
+            if delta_pct > 15:
+                log.warning(
+                    "Calibration shift >15%% [%s] : mu %.4f → %.4f (%.1f%%)",
+                    signal, old.get("mu", 0), values["mu"], delta_pct,
+                )
             log.info(
                 f"Recalibration globale [{signal}] : "
                 f"mu {old.get('mu')} → {values['mu']} | "
                 f"sigma {old.get('sigma')} → {values['sigma']}"
             )
-        log.info("Recalibration globale terminée.")
+            cal_entries.append({
+                "zone_id": None, "signal": signal,
+                "old_mu": old.get("mu"), "new_mu": values["mu"],
+                "old_sigma": old.get("sigma"), "new_sigma": values["sigma"],
+                "row_count": n_rows, "cutoff_ts": CALIBRATION_CUTOFF_TS,
+                "skipped": 0,
+            })
+        log.info("Recalibration globale terminée (%d relevés).", n_rows)
 
     zone_baselines = get_calibration_baselines_per_zone(min_count=min_count // 2)
 
     scoring.set_baselines(global_bl, zone_baselines)
     log.info("Recalibration par zone : %d zones calibrées.", len(zone_baselines))
+
+    # Persist calibration log
+    save_calibration_log(cal_entries)
+
+    # Update in-memory metadata for /health
+    _calibration_meta["last_calibrated_at"] = datetime.now(_tz.utc).isoformat(timespec="seconds")
+    _calibration_meta["row_count"] = n_rows
+    _calibration_meta["zones_calibrated"] = len(zone_baselines)
 
 
 async def _backup_loop():
@@ -210,13 +247,41 @@ app.include_router(reports_router)
 
 @app.get("/health", tags=["system"])
 async def health():
+    from datetime import datetime, timezone as _tz
     state = get_cache_state()
+
+    # Compute stale_warning: true if last calibration > 25h ago
+    stale = False
+    last_cal = _calibration_meta.get("last_calibrated_at")
+    if last_cal:
+        try:
+            age_s = (datetime.now(_tz.utc) - datetime.fromisoformat(last_cal)).total_seconds()
+            stale = age_s > 25 * 3600
+        except (ValueError, TypeError):
+            stale = True
+
+    # Per-signal summary from current baselines
+    signals_summary = {}
+    for sig, bl in scoring.BASELINE.items():
+        signals_summary[sig] = {
+            "global_mu": bl["mu"],
+            "global_sigma": bl["sigma"],
+        }
+
     return {
         "status":    "ok",
         "zones":     12,
         "cache_age": state["cache_age_s"],
         "ttl":       CACHE_TTL_SECONDS,
         "baseline":  scoring.BASELINE,
+        "calibration": {
+            "last_calibrated_at": _calibration_meta.get("last_calibrated_at"),
+            "cutoff_ts": CALIBRATION_CUTOFF_TS,
+            "row_count": _calibration_meta.get("row_count"),
+            "zones_with_custom_baseline": _calibration_meta.get("zones_calibrated", 0),
+            "signals_summary": signals_summary,
+            "stale_warning": stale,
+        },
     }
 
 

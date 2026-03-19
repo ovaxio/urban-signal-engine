@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from services.storage import _get_conn, DB_PATH
+from services.storage import _get_conn, DB_PATH, get_raw_incident_at
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,7 @@ def evaluate_forecasts(
     Compare les forecasts passés avec les scores actuels.
     Pour chaque forecast dont target_ts est dans [now - tolerance, now + tolerance]
     et qui n'a pas encore été évalué, on enregistre le score réel et le delta.
+    Si |delta| > 10 et raw_incident > 0 à l'instant évalué → incident_surprise = 1.
     """
     now = datetime.now(timezone.utc)
     window_start = (now - timedelta(minutes=tolerance_minutes)).isoformat(timespec="seconds")
@@ -117,7 +118,7 @@ def evaluate_forecasts(
     """
     sql_update = """
         UPDATE forecast_history
-        SET actual_score = ?, delta = ?, evaluated_at = ?
+        SET actual_score = ?, delta = ?, evaluated_at = ?, incident_surprise = ?
         WHERE id = ?
     """
 
@@ -133,7 +134,13 @@ def evaluate_forecasts(
             if actual is None:
                 continue
             delta = actual - row["predicted_score"]
-            conn.execute(sql_update, (actual, delta, eval_ts, row["id"]))
+            # Inline incident_surprise detection
+            surprise = 0
+            if abs(delta) > 10:
+                raw_inc = get_raw_incident_at(row["zone_id"], eval_ts, db_path=db_path)
+                if raw_inc > 0:
+                    surprise = 1
+            conn.execute(sql_update, (actual, delta, eval_ts, surprise, row["id"]))
             evaluated += 1
 
     if evaluated:
@@ -144,22 +151,23 @@ def evaluate_forecasts(
 # ─── Flag Incident Surprises ──────────────────────────────────────────────────
 
 def flag_incident_surprises(
-    incident_events: Dict[str, List[Dict]],
+    incident_events: Dict[str, List[Dict]] = None,
     db_path: Path = DB_PATH,
 ) -> int:
     """
-    Marque les forecasts évalués comme 'incident_surprise' si des incidents
-    non prévus sont apparus entre ts_forecast et target_ts pour la zone.
+    Backfill : marque les forecasts évalués comme 'incident_surprise'
+    en vérifiant raw_incident dans signals_history au moment de l'évaluation.
+    Critères : |delta| > 10 AND raw_incident > 0 à evaluated_at ±5min.
+    Le paramètre incident_events est conservé pour compatibilité mais ignoré
+    (la détection inline dans evaluate_forecasts() couvre les nouveaux cas).
     """
-    if not incident_events:
-        return 0
-
     sql_select = """
-        SELECT id, zone_id, ts_forecast
+        SELECT id, zone_id, evaluated_at
         FROM forecast_history
         WHERE actual_score IS NOT NULL
           AND incident_surprise = 0
           AND ABS(delta) > 10
+          AND evaluated_at IS NOT NULL
     """
     sql_update = "UPDATE forecast_history SET incident_surprise = 1 WHERE id = ?"
 
@@ -168,18 +176,15 @@ def flag_incident_surprises(
         conn.row_factory = sqlite3.Row
         rows = conn.execute(sql_select).fetchall()
 
-        for row in rows:
-            zone_events = incident_events.get(row["zone_id"], [])
-            ts_fc = row["ts_forecast"]
-            for ev in zone_events:
-                start = ev.get("starttime", "")
-                if start and start > ts_fc:
-                    conn.execute(sql_update, (row["id"],))
-                    flagged += 1
-                    break
+    for row in rows:
+        raw_inc = get_raw_incident_at(row["zone_id"], row["evaluated_at"], db_path=db_path)
+        if raw_inc > 0:
+            with _get_conn(db_path) as conn:
+                conn.execute(sql_update, (row["id"],))
+            flagged += 1
 
     if flagged:
-        logger.info("forecast_history : %d prévision(s) marquée(s) incident_surprise.", flagged)
+        logger.info("forecast_history : %d prévision(s) marquée(s) incident_surprise (backfill).", flagged)
     return flagged
 
 

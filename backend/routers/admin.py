@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, EmailStr
 
 from services.auth import generate_api_key, revoke_api_key, list_api_keys
+from services.storage import get_calibration_log
 
 log = logging.getLogger("admin")
 
@@ -53,3 +54,29 @@ async def delete_api_key(key_prefix: str, authorization: Optional[str] = Header(
         log.info(f"Admin: API key revoked (prefix: {key_prefix})")
         return {"status": "revoked", "key_prefix": key_prefix}
     raise HTTPException(status_code=404, detail="Clé non trouvée ou déjà révoquée.")
+
+
+@router.get("/calibration")
+async def get_calibration(authorization: Optional[str] = Header(default=None)):
+    """
+    Audit des calibrations : dernières entrées du calibration_log.
+    Signale les shifts > 15% pour revue manuelle.
+    """
+    _check_admin(authorization)
+    entries = get_calibration_log(limit=50)
+
+    large_shifts = []
+    for e in entries:
+        if e["old_mu"] is not None and e["new_mu"] is not None and not e["skipped"]:
+            denom = max(abs(e["old_mu"]), 0.01)
+            delta_pct = round(abs(e["new_mu"] - e["old_mu"]) / denom * 100, 1)
+            e["delta_mu_pct"] = delta_pct
+            if delta_pct > 15:
+                large_shifts.append(e)
+        else:
+            e["delta_mu_pct"] = None
+
+    return {
+        "entries": entries,
+        "large_shifts": large_shifts,
+    }
