@@ -55,13 +55,26 @@ async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
     ]
     incident_events = get_cache_data("incident_events") or {}
     transport_detail = get_cache_data("transport_detail") or {}
+    rss_incidents = get_cache_data("rss_incidents") or []
+    rss_context = [
+        {
+            "headline":      r.headline,
+            "incident_type": r.incident_type,
+            "severity_hint": r.severity_hint,
+            "published_at":  r.published_at,
+            "source":        r.source,
+            "url":           r.url,
+        }
+        for r in rss_incidents if r.zone_id == zone_id
+    ]
     return {
         **{k: v for k, v in z.items() if k != "alert"},
-        "explanation":     explanation,
-        "neighbors":       neighbors,
-        "incident_events": incident_events.get(zone_id, []),
+        "explanation":      explanation,
+        "neighbors":        neighbors,
+        "incident_events":  incident_events.get(zone_id, []),
         "transport_detail": transport_detail.get(zone_id),
-        "weights":         {k: round(v * 100) for k, v in WEIGHTS.items()},
+        "weights":          {k: round(v * 100) for k, v in WEIGHTS.items()},
+        "rss_context":      rss_context,
     }
 
 

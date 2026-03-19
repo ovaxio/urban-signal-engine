@@ -487,7 +487,18 @@ async def fetch_incidents() -> tuple:
                 deduped.append(ev)
         events_by_zone[z] = deduped
 
-    return current, schedule, events_by_zone
+    # Extract top incident label per zone (highest weight, for persistence)
+    top_labels: Dict[str, Dict[str, str]] = {}
+    for z in ZONE_CENTROIDS:
+        evts = events_by_zone[z]
+        if evts:
+            top = evts[0]  # already sorted by weight desc after dedup
+            evt_type = top.get("type", "")
+            source = top.get("source", "criter")
+            label = top.get("label", "")[:100]
+            top_labels[z] = {"label": label, "type": f"{source}/{evt_type}" if source == "tomtom" else evt_type}
+
+    return current, schedule, events_by_zone, top_labels
 
 # ---------------------------------------------------------------------------
 # Incidents TomTom — cache 30 min (budget : ≤2 500 req/mois)
@@ -854,7 +865,7 @@ async def fetch_all_signals() -> tuple:
         fetch_incidents(),
         fetch_weather_forecast(),
     )
-    incident_t, incident_schedule, incident_events = incident_result
+    incident_t, incident_schedule, incident_events, incident_labels = incident_result
 
     transport_detail: Dict[str, Dict[str, Any]] = {}
     try:
@@ -919,4 +930,4 @@ async def fetch_all_signals() -> tuple:
         }
         log.info("[smoothing] EWM appliqué sur %d zones.", len(result))
 
-    return result, incident_schedule, incident_events, weather_fc, transport_detail
+    return result, incident_schedule, incident_events, weather_fc, transport_detail, incident_labels

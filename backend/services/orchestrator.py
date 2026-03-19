@@ -22,6 +22,7 @@ from services.forecast_storage import (
     should_save_forecasts,
 )
 from services.alerts import check_alerts, dispatch_alerts
+from services.rss_incidents import fetch_rss_incidents
 
 log = logging.getLogger("orchestrator")
 
@@ -35,6 +36,7 @@ _cache: dict = {
     "incident_events":   {},
     "weather_forecast":  {},
     "transport_detail":  {},
+    "rss_incidents":     [],
     "fetched_at":        None,
     "lock":              asyncio.Lock(),
     "prev_scores":       {},
@@ -61,8 +63,14 @@ async def refresh_scores(force: bool = False) -> List[dict]:
                     z["zone_id"]: z["urban_score"] for z in _cache["scores"]
                 }
 
-            signals, incident_schedule, incident_events, weather_fc, transport_detail = await fetch_all_signals()
+            signals, incident_schedule, incident_events, weather_fc, transport_detail, incident_labels = await fetch_all_signals()
             scores = score_all_zones(signals)
+
+            # Attach top incident label to each score for persistence
+            for z in scores:
+                lbl = incident_labels.get(z["zone_id"], {})
+                z["incident_label"] = lbl.get("label")
+                z["incident_type"]  = lbl.get("type")
 
             if ENABLE_HISTORY:
                 save_scores_history(scores)
@@ -95,12 +103,20 @@ async def refresh_scores(force: bool = False) -> List[dict]:
             if new_alerts:
                 asyncio.create_task(dispatch_alerts(new_alerts))
 
+            # RSS enrichment (cached 10min, never blocks)
+            try:
+                rss_incidents = await fetch_rss_incidents()
+            except Exception as e:
+                log.warning("RSS fetch error (non-blocking): %s", e)
+                rss_incidents = []
+
             _cache["scores"]            = scores
             _cache["signals"]           = signals
             _cache["incident_schedule"] = incident_schedule
             _cache["incident_events"]   = incident_events
             _cache["weather_forecast"]  = weather_fc
             _cache["transport_detail"]  = transport_detail
+            _cache["rss_incidents"]     = rss_incidents
             _cache["fetched_at"]        = now
 
     return _cache["scores"]

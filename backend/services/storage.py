@@ -113,6 +113,8 @@ MIGRATE_ADD_RAW_COLUMNS = [
     "ALTER TABLE signals_history ADD COLUMN raw_transport REAL;",
     "ALTER TABLE signals_history ADD COLUMN raw_incident  REAL;",
     "ALTER TABLE signals_history ADD COLUMN source        TEXT DEFAULT 'live';",
+    "ALTER TABLE signals_history ADD COLUMN incident_label TEXT;",
+    "ALTER TABLE signals_history ADD COLUMN incident_type  TEXT;",
 ]
 
 
@@ -300,12 +302,12 @@ def save_scores_history(
             (ts, zone_id,
              traffic, weather, event, transport,
              raw_traffic, raw_weather, raw_event, raw_transport, raw_incident,
-             urban_score, level)
+             urban_score, level, incident_label, incident_type)
         VALUES
             (:ts, :zone_id,
              :traffic, :weather, :event, :transport,
              :raw_traffic, :raw_weather, :raw_event, :raw_transport, :raw_incident,
-             :urban_score, :level)
+             :urban_score, :level, :incident_label, :incident_type)
     """
 
     with _get_conn(db_path) as conn:
@@ -606,6 +608,31 @@ def get_raw_incident_at(
     return float(row["raw_incident"]) if row else 0.0
 
 
+def get_active_incident_label(
+    zone_id: str,
+    minutes: int = 10,
+    db_path: Path = DB_PATH,
+) -> tuple[Optional[str], Optional[str]]:
+    """
+    Retourne (label, type) du dernier incident enregistré pour une zone
+    dans les `minutes` dernières. (None, None) si aucun.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat(timespec="seconds")
+    sql = """
+        SELECT incident_label, incident_type
+        FROM signals_history
+        WHERE zone_id = ? AND ts >= ? AND incident_label IS NOT NULL
+        ORDER BY ts DESC
+        LIMIT 1
+    """
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(sql, (zone_id, cutoff)).fetchone()
+    if row:
+        return row["incident_label"], row["incident_type"]
+    return None, None
+
+
 # ─── Impact Report ────────────────────────────────────────────────────────────
 
 def get_history_range(
@@ -811,22 +838,24 @@ def _utc_now() -> str:
 def _build_row(entry: dict[str, Any], ts_fallback: str) -> dict[str, Any]:
     """Normalise un dict score → row SQL."""
     signals     = entry.get("signals", {})       # normalisés
-    raw_signals = entry.get("raw_signals", {})   # bruts ← NOUVEAU
+    raw_signals = entry.get("raw_signals", {})   # bruts
 
     return {
-        "ts":            entry.get("ts") or ts_fallback,
-        "zone_id":       entry["zone_id"],
+        "ts":              entry.get("ts") or ts_fallback,
+        "zone_id":         entry["zone_id"],
         # normalisés (existants)
-        "traffic":       signals.get("traffic"),
-        "weather":       signals.get("weather"),
-        "event":         signals.get("event"),
-        "transport":     signals.get("transport"),
-        # bruts (nouveaux)
-        "raw_traffic":   raw_signals.get("traffic"),
-        "raw_weather":   raw_signals.get("weather"),
-        "raw_event":     raw_signals.get("event"),
-        "raw_transport": raw_signals.get("transport"),
-        "raw_incident":  raw_signals.get("incident"),
-        "urban_score":   entry["urban_score"],
-        "level":         entry["level"],
+        "traffic":         signals.get("traffic"),
+        "weather":         signals.get("weather"),
+        "event":           signals.get("event"),
+        "transport":       signals.get("transport"),
+        # bruts
+        "raw_traffic":     raw_signals.get("traffic"),
+        "raw_weather":     raw_signals.get("weather"),
+        "raw_event":       raw_signals.get("event"),
+        "raw_transport":   raw_signals.get("transport"),
+        "raw_incident":    raw_signals.get("incident"),
+        "urban_score":     entry["urban_score"],
+        "level":           entry["level"],
+        "incident_label":  entry.get("incident_label"),
+        "incident_type":   entry.get("incident_type"),
     }
