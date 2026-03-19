@@ -278,6 +278,19 @@ export type SignalsBreakdown = {
   incident_zscore: number;
 };
 
+export type EscalationTrigger = {
+  condition: string;
+  action: string;
+};
+
+export type DpsInfo = {
+  categorie: string;
+  description: string;
+  ratio: string;
+  staffing_estimate: string;
+  zones_tendu: number;
+};
+
 export type PreEventReport = {
   report_type: "pre_event";
   event: {
@@ -289,6 +302,7 @@ export type PreEventReport = {
   };
   generated_at: string;
   simulation_horizon_h: number;
+  bluf: string;
   executive_summary: {
     overall_risk: string;
     overall_peak_score: number;
@@ -299,10 +313,13 @@ export type PreEventReport = {
   zones_analysis: Record<string, SimulateZone>;
   risk_windows_summary: RiskWindowSummary[];
   recommendations: ReportRecommendation[];
+  escalation_triggers: EscalationTrigger[];
+  dps: DpsInfo;
   weather_context: {
     summary: string;
     risk_modifier: string;
   };
   signals_breakdown: Record<string, SignalsBreakdown>;
   data_confidence: "high" | "medium" | "low";
+  next_update: string;
 };

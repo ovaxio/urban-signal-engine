@@ -33,19 +33,19 @@ STATIC_EVENTS: List[dict] = [
     {
         "name":   "Foire de Lyon (Eurexpo)",
         "dates":  _days("2026-03-20", "2026-03-30"),
-        "zone":   "villette",       # Eurexpo → zone villette/est
-        "lat":    45.7310, "lng": 4.9220,
-        "weight": 1.5,
+        "zone":   "part-dieu",      # impact réel = transit (T3 tram, 80% visiteurs via Part-Dieu)
+        "lat":    45.7605, "lng": 4.8597,  # Gare Part-Dieu (hub de transit vers Eurexpo)
+        "weight": 1.2,              # réduit vs 1.5 : impact indirect (transit), pas direct (lieu)
         "hours":  (9, 19),          # salon pro/public journée
         "ramp":   2,
     },
     {
         "name":   "Lyon Urban Trail",
         "dates":  [date(2026, 3, 29)],
-        "zone":   "fourviere",
-        "lat":    45.7600, "lng": 4.8200,
+        "zone":   "vieux-lyon",     # départ Quai Fulchiron, arrivée Place Saint-Jean
+        "lat":    45.7594, "lng": 4.8275,
         "weight": 1.2,
-        "hours":  (7, 14),          # départ 8h, arrivées jusqu'à 14h
+        "hours":  (7, 16),          # premier départ 7h (38km), arrivées jusqu'à ~16h
         "ramp":   1,
     },
     # --- Q2 ---
@@ -53,7 +53,7 @@ STATIC_EVENTS: List[dict] = [
         "name":   "Quais du Polar",
         "dates":  _days("2026-04-03", "2026-04-05"),
         "zone":   "presquile",
-        "lat":    45.7560, "lng": 4.8320,
+        "lat":    45.7640, "lng": 4.8340,  # Hôtel de Ville / Palais de la Bourse
         "weight": 0.8,
         "hours":  (10, 22),         # festival littéraire journée + soirée
         "ramp":   1,
@@ -62,9 +62,9 @@ STATIC_EVENTS: List[dict] = [
         "name":   "Nuits Sonores",
         "dates":  _days("2026-05-13", "2026-05-17"),
         "zone":   "confluence",
-        "lat":    45.7380, "lng": 4.8170,
+        "lat":    45.7364, "lng": 4.8150,  # La Sucrière, quai Rambaud
         "weight": 1.0,
-        "hours":  (18, 23),         # festival nocturne (continue après 23h mais hors sim)
+        "hours":  (16, 23),         # Days 16h + Nuits 22h → couvert par 16-23
         "ramp":   2,
     },
     {
@@ -88,8 +88,8 @@ STATIC_EVENTS: List[dict] = [
     {
         "name":   "Lyon Street Food Festival",
         "dates":  _days("2026-06-11", "2026-06-14"),
-        "zone":   "gerland",
-        "lat":    45.7330, "lng": 4.8330,
+        "zone":   "confluence",     # Grandes Locos, La Mulatière (nearest zone)
+        "lat":    45.7212, "lng": 4.8159,
         "weight": 0.8,
         "hours":  (11, 23),         # food festival midi → soirée
         "ramp":   1,
@@ -105,29 +105,29 @@ STATIC_EVENTS: List[dict] = [
         "ramp":   2,
     },
     {
-        "name":   "Biennale de la Danse / d'Art Contemporain",
-        "dates":  _days("2026-09-10", "2026-10-10"),
-        "zone":   "presquile",
-        "lat":    45.7560, "lng": 4.8320,
+        "name":   "Biennale d'Art Contemporain",
+        "dates":  _days("2026-09-19", "2026-12-31"),  # Sep 19 → ~Jan 3 2027
+        "zone":   "gerland",        # Usines Fagor (29 000 m², plus grand site)
+        "lat":    45.7260, "lng": 4.8340,
         "weight": 1.0,
-        "hours":  (14, 22),         # représentations après-midi + soirée
+        "hours":  (10, 19),         # expositions journée
         "ramp":   1,
     },
     # --- Q4 ---
     {
         "name":   "Run in Lyon",
         "dates":  [date(2026, 10, 4)],
-        "zone":   "gerland",
-        "lat":    45.7330, "lng": 4.8330,
+        "zone":   "presquile",      # départ Vieux-Lyon, arrivée/village Place Bellecour
+        "lat":    45.7545, "lng": 4.8260,
         "weight": 1.2,
-        "hours":  (7, 14),          # course matin, fermetures de route
+        "hours":  (7, 15),          # marathon départ 8h, arrivées jusqu'à ~14h30
         "ramp":   1,
     },
     {
         "name":   "Festival Lumière",
         "dates":  _days("2026-10-10", "2026-10-18"),
-        "zone":   "part-dieu",
-        "lat":    45.7600, "lng": 4.8600,
+        "zone":   "montchat",       # Institut Lumière, 25 rue du Premier Film (Lyon 8e)
+        "lat":    45.7450, "lng": 4.8706,
         "weight": 1.2,
         "hours":  (10, 23),         # séances cinéma toute la journée
         "ramp":   1,
@@ -135,10 +135,10 @@ STATIC_EVENTS: List[dict] = [
     {
         "name":   "Equita Lyon (Eurexpo)",
         "dates":  _days("2026-10-28", "2026-11-01"),
-        "zone":   "villette",
-        "lat":    45.7310, "lng": 4.9220,
-        "weight": 1.2,
-        "hours":  (9, 19),          # salon équestre journée
+        "zone":   "part-dieu",      # impact réel = transit (T3 tram vers Eurexpo)
+        "lat":    45.7605, "lng": 4.8597,  # Gare Part-Dieu
+        "weight": 1.0,              # réduit : impact indirect (transit)
+        "hours":  (8, 20),          # salon 9h-19h, samedi jusqu'à 22h30
         "ramp":   2,
     },
     # Fête des Lumières — ~2M visiteurs sur 4 nuits, Lyon paralysée

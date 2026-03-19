@@ -349,6 +349,64 @@ function SignalsBreakdown({
 
 /* ─── Main Component ───────────────────────────────────────────────────────── */
 
+/* ─── Escalation Triggers ──────────────────────────────────────────────────── */
+
+function EscalationTriggers({ triggers }: { triggers: { condition: string; action: string }[] }) {
+  if (!triggers.length) return null;
+  return (
+    <div className="rounded-lg border border-border bg-bg-card p-4">
+      <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
+        TRIGGERS D&apos;ESCALADE
+      </div>
+      <div className="flex flex-col gap-2">
+        {triggers.map((t, i) => (
+          <div key={i} className="rounded-md bg-bg-inner px-3 py-2">
+            <div className="text-[12px] font-semibold text-text-primary">
+              SI : {t.condition}
+            </div>
+            <div className="mt-0.5 text-[11px] text-text-secondary">
+              ALORS : {t.action}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── DPS Info ─────────────────────────────────────────────────────────────── */
+
+function DpsSection({ dps }: { dps: { categorie: string; description: string; ratio: string; staffing_estimate: string; zones_tendu: number } }) {
+  return (
+    <div className="rounded-lg border border-border bg-bg-card p-4">
+      <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
+        DIMENSIONNEMENT DPS
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <div className="text-[9px] tracking-wide text-text-muted">CATÉGORIE</div>
+          <div className="text-sm font-bold text-text-primary">{dps.categorie}</div>
+        </div>
+        <div>
+          <div className="text-[9px] tracking-wide text-text-muted">EFFECTIF ESTIMÉ</div>
+          <div className="text-sm font-bold text-text-primary">{dps.staffing_estimate}</div>
+        </div>
+        <div>
+          <div className="text-[9px] tracking-wide text-text-muted">RATIO</div>
+          <div className="text-[11px] text-text-secondary">{dps.ratio}</div>
+        </div>
+        <div>
+          <div className="text-[9px] tracking-wide text-text-muted">ZONES TENDU+</div>
+          <div className="text-sm font-bold text-text-primary">{dps.zones_tendu}</div>
+        </div>
+      </div>
+      <div className="mt-2 text-[10px] text-text-muted">{dps.description}</div>
+    </div>
+  );
+}
+
+/* ─── Main Component ───────────────────────────────────────────────────────── */
+
 export default function PreEventReportView({ report }: { report: PreEventReport }) {
   const sortedZones = Object.entries(report.zones_analysis).sort(
     ([, a], [, b]) => b.peak_score - a.peak_score
@@ -371,9 +429,16 @@ export default function PreEventReportView({ report }: { report: PreEventReport 
         </div>
       </div>
 
+      {/* BLUF */}
+      <div className="rounded-lg border-l-[3px] bg-bg-card px-4 py-3" style={{ borderColor: scoreColor(report.executive_summary.overall_peak_score) }}>
+        <div className="text-[13px] leading-relaxed text-text-primary">{report.bluf}</div>
+      </div>
+
       <ExecutiveSummary report={report} />
       <Recommendations recommendations={report.recommendations} />
+      <EscalationTriggers triggers={report.escalation_triggers} />
       <RiskWindowsList windows={report.risk_windows_summary} />
+      <DpsSection dps={report.dps} />
       <WeatherContext context={report.weather_context} />
 
       {/* Zone cards */}
@@ -392,8 +457,7 @@ export default function PreEventReportView({ report }: { report: PreEventReport 
 
       <div className="pt-2 text-center text-[10px] text-text-faint">
         Rapport généré par Urban Signal Engine le{" "}
-        {report.generated_at.replace("T", " ").slice(0, 16)} · Simulation prospective, confiance{" "}
-        {report.data_confidence === "high" ? "haute" : report.data_confidence === "medium" ? "moyenne" : "faible"}
+        {report.generated_at.replace("T", " ").slice(0, 16)} · {report.next_update}
       </div>
     </div>
   );

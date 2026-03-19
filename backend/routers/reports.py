@@ -476,6 +476,61 @@ async def pre_event_report(
     else:
         confidence = "low"
 
+    # ── BLUF narrative ──────────────────────────────────────────────────
+    critical_zone_names = [ZONE_NAMES.get(z, z) for z in critical_zones]
+    if overall_max >= 72:
+        bluf = (
+            f"{ev['name']} du {target_date.strftime('%d/%m')} présente un risque {overall_risk} "
+            f"(pic estimé {overall_max}) concentré sur "
+            f"{', '.join(critical_zone_names[:3])} entre {peak_window['from']}h et {peak_window['to']}h. "
+            f"Signal dominant : trafic. Renforcement dispositif recommandé dès {max(peak_window['from'] - 3, 6)}h."
+        )
+    elif overall_max >= 55:
+        bluf = (
+            f"{ev['name']} du {target_date.strftime('%d/%m')} présente un risque {overall_risk} "
+            f"(pic estimé {overall_max}) sur {', '.join(critical_zone_names[:3]) or 'les zones surveillées'} "
+            f"entre {peak_window['from']}h et {peak_window['to']}h. "
+            f"Vigilance renforcée recommandée."
+        )
+    else:
+        bluf = (
+            f"{ev['name']} du {target_date.strftime('%d/%m')} — conditions nominales prévues "
+            f"(pic estimé {overall_max}, {overall_risk}). Dispositif standard suffisant."
+        )
+
+    # ── Escalation triggers ─────────────────────────────────────────────
+    escalation_triggers = []
+    if overall_max >= 55:
+        escalation_triggers.append({
+            "condition": f"Score dépasse 65 sur une zone primaire à T-2h",
+            "action": "Activer protocole renforcé. Ajouter effectifs périmètre.",
+        })
+    if sim["weather_context"]["risk_modifier"] in ("medium", "high"):
+        escalation_triggers.append({
+            "condition": "Dégradation météo confirmée (pluie > 5mm/h ou vent > 50km/h)",
+            "action": "Ajouter 2 agents périmètre. Sécuriser accès glissants.",
+        })
+    if len(critical_zones) >= 3:
+        escalation_triggers.append({
+            "condition": f"3+ zones simultanément en CRITIQUE",
+            "action": "Coordination inter-zones. Alerter le donneur d'ordres.",
+        })
+    escalation_triggers.append({
+        "condition": "Incident majeur non prévu (accident, manif, panne TCL)",
+        "action": "Basculer en mode incident. Rapport actualisé disponible en temps réel sur le dashboard.",
+    })
+
+    # ── DPS mapping ─────────────────────────────────────────────────────
+    _DPS_MAP = {
+        0: {"categorie": "PAPS", "description": "Dispositif de base (2 secouristes)", "ratio": "1 agent / 300 personnes"},
+        1: {"categorie": "DPS-PE", "description": "Petit événement", "ratio": "1 agent / 200 personnes"},
+        2: {"categorie": "DPS-ME", "description": "Moyen événement — dispositif renforcé", "ratio": "1 agent / 100 personnes"},
+        3: {"categorie": "DPS-GE", "description": "Grand événement — coordination préfectorale", "ratio": "1 agent / 50 personnes"},
+    }
+    dps = _DPS_MAP[rec_level]
+    n_zones_tendu = sum(1 for z in focus_zones if zones_analysis.get(z, {}).get("peak_score", 0) >= 55)
+    staffing_estimate = f"{n_zones_tendu * 4}-{n_zones_tendu * 6} agents" if n_zones_tendu > 0 else "Effectif standard"
+
     # Build report
     return {
         "report_type": "pre_event",
@@ -488,6 +543,7 @@ async def pre_event_report(
         },
         "generated_at": sim["generated_at"],
         "simulation_horizon_h": days_ahead * 24,
+        "bluf": bluf,
         "executive_summary": {
             "overall_risk": overall_risk,
             "overall_peak_score": overall_max,
@@ -498,7 +554,14 @@ async def pre_event_report(
         "zones_analysis": zones_analysis,
         "risk_windows_summary": _build_risk_windows_summary(zones_analysis, focus_zones),
         "recommendations": _build_recommendations(zones_analysis, sorted(all_event_zones)),
+        "escalation_triggers": escalation_triggers,
+        "dps": {
+            **dps,
+            "staffing_estimate": staffing_estimate,
+            "zones_tendu": n_zones_tendu,
+        },
         "weather_context": sim["weather_context"],
         "signals_breakdown": _build_signals_breakdown(zones_analysis, focus_zones),
         "data_confidence": confidence,
+        "next_update": f"Rapport actualisé disponible à J-1 ({(target_date - timedelta(days=1)).isoformat()}).",
     }
