@@ -761,10 +761,18 @@ VELOV_URL = (
     "https://data.grandlyon.com/fr/datapusher/ws/rdata"
     "/jcd_jcdecaux.jcdvelov/all.json?maxfeatures=-1&start=1"
 )
-SEUIL_PASSAGES = 10
+SEUIL_PASSAGES_PAR_STOP = 40   # ~40 passages par arrêt en 15 min = service normal en pointe
+
+# Pré-calculer le nombre d'arrêts par zone (pour normalisation passages)
+_STOPS_PER_ZONE: Dict[str, int] = {}
+for _sid, _zid in ARRET_ZONE.items():
+    _STOPS_PER_ZONE[_zid] = _STOPS_PER_ZONE.get(_zid, 0) + 1
+
 
 def _parse_delai(raw: str) -> Optional[float]:
     raw = raw.strip()
+    if raw.lower() in ("proche", "imminent"):
+        return 0.5  # bus imminent → compte comme < 1 min
     m = re.match(r"^(\d+)\s*min$", raw)
     if m:
         return float(m.group(1))
@@ -808,7 +816,14 @@ async def _fetch_passages() -> Dict[str, float]:
         delai_min = _parse_delai(str(delai_raw))
         if delai_min is not None and delai_min <= 15:
             zone_count[zone] = zone_count.get(zone, 0) + 1
-    return {z: 1.0 - min(cnt / SEUIL_PASSAGES, 1.0) for z, cnt in zone_count.items()}
+    # Normaliser par nombre d'arrêts mappés dans la zone
+    # avg_per_stop / seuil → 0.0 = plein de bus (normal), 1.0 = aucun bus (tension max)
+    result: Dict[str, float] = {}
+    for z, cnt in zone_count.items():
+        n_stops = _STOPS_PER_ZONE.get(z, 1)
+        avg_per_stop = cnt / n_stops
+        result[z] = 1.0 - min(avg_per_stop / SEUIL_PASSAGES_PAR_STOP, 1.0)
+    return result
 
 async def _fetch_velov() -> Dict[str, float]:
     async with httpx.AsyncClient(timeout=15) as client:
