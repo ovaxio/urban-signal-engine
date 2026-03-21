@@ -122,6 +122,7 @@ APIS = ExternalAPIs()
 
 # ── Centroïdes des 12 zones lyonnaises ────────────────────────────────────────
 # Source unique — utilisé par ingestion (nearest_zone) et events (haversine).
+# SYNC: frontend/domain/constants.ts doit refléter ces valeurs exactement.
 ZONE_CENTROIDS = {
     "part-dieu":    (45.7580, 4.8490),
     "presquile":    (45.7558, 4.8320),

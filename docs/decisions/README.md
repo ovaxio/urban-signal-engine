@@ -9,3 +9,4 @@ Read relevant ADR before modifying any component listed in Triggers.
 | [003](ADR-003-learning-calibration.md) | Learning + calibration | Accepted | 2026-03-19 | storage.py calibration, smoothing.py, evaluate_forecasts |
 | [004](ADR-004-gtm-commercial.md) | GTM + commercial | Accepted | 2026-03-10 | pricing, segments, landing page copy |
 | [005](ADR-005-product-architecture-mvp.md) | Product architecture MVP | Accepted | 2026-03-19 | dependencies, infra, new signal sources, DB migration |
+| [006](ADR-006-zone-centroids-source-of-truth.md) | Zone centroids source of truth | Accepted | 2026-03-21 | config.py ZONE_CENTROIDS, frontend/domain/constants.ts, ZoneMap.tsx |
