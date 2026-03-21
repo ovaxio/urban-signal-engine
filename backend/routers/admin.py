@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, EmailStr
 
 from services.auth import generate_api_key, revoke_api_key, list_api_keys
-from services.storage import get_calibration_log
+from services.storage import get_calibration_log, get_request_logs
 
 log = logging.getLogger("admin")
 
@@ -54,6 +54,19 @@ async def delete_api_key(key_prefix: str, authorization: Optional[str] = Header(
         log.info(f"Admin: API key revoked (prefix: {key_prefix})")
         return {"status": "revoked", "key_prefix": key_prefix}
     raise HTTPException(status_code=404, detail="Clé non trouvée ou déjà révoquée.")
+
+
+@router.get("/request-logs")
+async def get_request_logs_endpoint(
+    authorization: Optional[str] = Header(default=None),
+    limit: int = 100,
+    status: Optional[int] = None,
+    path: Optional[str] = None,
+):
+    """Historique des requêtes HTTP — filtre par status_code et/ou path."""
+    _check_admin(authorization)
+    logs = get_request_logs(limit=limit, status_code=status, path_filter=path)
+    return {"count": len(logs), "logs": logs}
 
 
 @router.get("/calibration")

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -33,7 +34,7 @@ from routers.reports import router as reports_router
 from config import CACHE_TTL_SECONDS
 from services.storage import (
     init_db, get_calibration_baselines, get_calibration_baselines_per_zone,
-    save_calibration_log, CALIBRATION_CUTOFF_TS,
+    save_calibration_log, CALIBRATION_CUTOFF_TS, save_request_log, purge_old_request_logs,
 )
 from services.auth import init_auth_db
 import services.scoring as scoring
@@ -83,6 +84,7 @@ async def _calibration_loop():
 
         log.info("Recalibration hebdomadaire — démarrage.")
         _apply_calibration(min_count=500)
+        purge_old_request_logs(days=7)
 
         # Attendre 7 jours avant le prochain cycle
         await asyncio.sleep(INTERVAL_DAYS * 24 * 3600)
@@ -225,10 +227,13 @@ app.add_middleware(
 )
 
 
-# ── Security headers middleware ───────────────────────────────────────────────
+# ── Security headers + request logging middleware ─────────────────────────────
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
+    t0 = time.perf_counter()
     response: Response = await call_next(request)
+    duration_ms = (time.perf_counter() - t0) * 1000
+
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
@@ -236,6 +241,27 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if os.getenv("SENTRY_ENV") == "production":
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+
+    if request.url.path != "/health":
+        log.info(
+            "%s %s %d %.0fms %s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+            request.client.host if request.client else "-",
+        )
+        try:
+            save_request_log(
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                duration_ms=duration_ms,
+                client_ip=request.client.host if request.client else None,
+            )
+        except Exception as e:
+            log.warning("request_log write failed: %s", e)
+
     return response
 
 

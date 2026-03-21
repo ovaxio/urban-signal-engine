@@ -97,12 +97,27 @@ CREATE TABLE IF NOT EXISTS calibration_log (
 );
 """
 
+CREATE_REQUEST_LOGS = """
+CREATE TABLE IF NOT EXISTS request_logs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT    NOT NULL,
+    method      TEXT    NOT NULL,
+    path        TEXT    NOT NULL,
+    status_code INTEGER NOT NULL,
+    duration_ms REAL    NOT NULL,
+    client_ip   TEXT
+);
+"""
+
 CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_sh_zone_ts  ON signals_history (zone_id, ts);",
     "CREATE INDEX IF NOT EXISTS idx_sh_ts       ON signals_history (ts);",
     "CREATE INDEX IF NOT EXISTS idx_al_ts       ON alerts_log (ts DESC);",
     "CREATE INDEX IF NOT EXISTS idx_fh_target   ON forecast_history (target_ts, zone_id);",
     "CREATE INDEX IF NOT EXISTS idx_fh_zone     ON forecast_history (zone_id, ts_forecast);",
+    "CREATE INDEX IF NOT EXISTS idx_rq_ts       ON request_logs (ts DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_rq_path_ts  ON request_logs (path, ts DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_rq_status   ON request_logs (status_code, ts DESC);",
 ]
 
 # Migration : ajoute les colonnes raw si elles n'existent pas encore (base existante)
@@ -134,6 +149,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
         conn.execute(CREATE_FORECAST_HISTORY)
         conn.execute(CREATE_CONTACT)
         conn.execute(CREATE_CALIBRATION_LOG)
+        conn.execute(CREATE_REQUEST_LOGS)
         for idx_sql in CREATE_INDEXES:
             conn.execute(idx_sql)
         _migrate_raw_columns(conn)
@@ -812,6 +828,61 @@ def save_contact(nom: str, email: str, organisation: str, message: str, db_path:
             (nom, email, organisation, message, now),
         )
     logger.info("Contact submission from %s (%s)", email, organisation)
+
+
+# ─── Request logs ───────────────────────────────────────────────────────────────
+
+def save_request_log(
+    method: str,
+    path: str,
+    status_code: int,
+    duration_ms: float,
+    client_ip: Optional[str],
+    db_path: Path = DB_PATH,
+) -> None:
+    """Persiste un log de requête HTTP. Appelé en fire-and-forget depuis le middleware."""
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with _get_conn(db_path) as conn:
+        conn.execute(
+            "INSERT INTO request_logs (ts, method, path, status_code, duration_ms, client_ip) VALUES (?,?,?,?,?,?)",
+            (now, method, path, status_code, round(duration_ms, 1), client_ip),
+        )
+
+
+def get_request_logs(
+    limit: int = 100,
+    status_code: Optional[int] = None,
+    path_filter: Optional[str] = None,
+    db_path: Path = DB_PATH,
+) -> List[Dict[str, Any]]:
+    """Retourne les logs de requêtes récents, filtrables par status et path."""
+    conditions: List[str] = []
+    params: List[Any] = []
+    if status_code is not None:
+        conditions.append("status_code = ?")
+        params.append(status_code)
+    if path_filter:
+        conditions.append("path LIKE ?")
+        params.append(f"%{path_filter}%")
+    where = " AND ".join(conditions) if conditions else "1=1"
+    params.append(limit)
+    with _get_conn(db_path) as conn:
+        rows = conn.execute(
+            f"SELECT ts, method, path, status_code, duration_ms, client_ip FROM request_logs WHERE {where} ORDER BY ts DESC LIMIT ?",
+            params,
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def purge_old_request_logs(days: int = 7, db_path: Path = DB_PATH) -> int:
+    """Supprime les logs de requêtes plus anciens que `days` jours. Retourne le nombre de lignes supprimées."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    with _get_conn(db_path) as conn:
+        cursor = conn.execute("DELETE FROM request_logs WHERE ts < ?", (cutoff,))
+        deleted = cursor.rowcount
+    if deleted:
+        logger.info("request_logs: %d entrées purgées (>%d jours)", deleted, days)
+    return deleted
 
 
 # ─── Internes ──────────────────────────────────────────────────────────────────

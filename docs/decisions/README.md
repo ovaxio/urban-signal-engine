@@ -10,3 +10,4 @@ Read relevant ADR before modifying any component listed in Triggers.
 | [004](ADR-004-gtm-commercial.md) | GTM + commercial | Accepted | 2026-03-10 | pricing, segments, landing page copy |
 | [005](ADR-005-product-architecture-mvp.md) | Product architecture MVP | Accepted | 2026-03-19 | dependencies, infra, new signal sources, DB migration |
 | [006](ADR-006-zone-centroids-source-of-truth.md) | Zone centroids source of truth | Accepted | 2026-03-21 | config.py ZONE_CENTROIDS, frontend/domain/constants.ts, ZoneMap.tsx |
+| [007](ADR-007-request-logging-strategy.md) | Request logging strategy (SQLite MVP) | Accepted | 2026-03-21 | main.py middleware, storage.py request_logs, external logging SaaS |

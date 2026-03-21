@@ -229,6 +229,7 @@ Decisions are in `docs/decisions/`. Read the relevant ADR before modifying any c
 | 004 | GTM + commercial | pricing, segments, landing page copy |
 | 005 | Product architecture MVP | dependencies, infra, new signal sources |
 | 006 | Zone centroids source of truth | config.py ZONE_CENTROIDS, frontend/domain/constants.ts, ZoneMap.tsx |
+| 007 | Request logging strategy (SQLite MVP) | main.py middleware, storage.py request_logs |
 
 ## Target market (context for naming/comments)
 Primary: sécurité privée / événementielle Lyon (rapport événement 390€ HT one-shot → abonnement 490€/mois)
