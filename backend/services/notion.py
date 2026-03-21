@@ -65,6 +65,7 @@ async def send_lead_to_notion(
     organisation: str,
     message: str,
     submitted_at: str,
+    source: str = "Formulaire",
 ) -> None:
     """Crée une page dans la base Notion des leads. No-op si env vars absents."""
     token = os.getenv("NOTION_TOKEN", "").strip()
@@ -87,7 +88,7 @@ async def send_lead_to_notion(
                     "Message": {"rich_text": [{"text": {"content": message[:2000]}}]},
                     "Date": {"date": {"start": submitted_at}},
                     "Statut": {"select": {"name": "Nouveau"}},
-                    "Source": {"select": {"name": "Formulaire"}},
+                    "Source": {"select": {"name": source}},
                 },
             }
             r = await client.post(

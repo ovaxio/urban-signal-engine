@@ -21,6 +21,7 @@ class ContactRequest(BaseModel):
     email: EmailStr
     organisation: str
     message: str
+    source: str = "Formulaire"
 
 
 @router.post("", status_code=201)
@@ -48,7 +49,7 @@ async def submit_contact(payload: ContactRequest):
             log.warning("Contact webhook failed: %s", e)
 
     await send_lead_to_notion(
-        payload.nom, payload.email, payload.organisation, payload.message, submitted_at
+        payload.nom, payload.email, payload.organisation, payload.message, submitted_at, payload.source
     )
 
     return {"status": "ok", "message": "Message envoyé avec succès."}

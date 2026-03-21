@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import s from "../page.module.css";
+import { submitContact } from "@/lib/api";
 
 export default function ContactForm() {
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
@@ -9,14 +10,17 @@ export default function ContactForm() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus("sending");
-    const data = Object.fromEntries(new FormData(e.currentTarget));
+    const fd = new FormData(e.currentTarget);
+    const event = fd.get("event") as string;
+    const message = fd.get("message") as string;
     try {
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+      await submitContact({
+        nom: fd.get("name") as string,
+        email: fd.get("email") as string,
+        organisation: fd.get("company") as string,
+        message: event ? `[Événement: ${event}] ${message}`.trim() : message,
+        source: "Landing",
       });
-      if (!res.ok) throw new Error();
       setStatus("success");
     } catch {
       setStatus("error");

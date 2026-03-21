@@ -25,6 +25,7 @@ export default function ContactPage() {
         email: fd.get("email") as string,
         organisation: fd.get("organisation") as string,
         message: fd.get("message") as string,
+        source: "Contact",
       });
       setState("success");
     } catch {
