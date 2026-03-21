@@ -19,5 +19,11 @@ services:
         value: "true"
       - key: ALERT_WEBHOOK_URL
         value: ""
+      - key: CONTACT_WEBHOOK_URL
+        value: ""
+      - key: NOTION_TOKEN
+        sync: false
+      - key: NOTION_LEADS_DB_ID
+        sync: false
       - key: ALLOWED_ORIGINS
         value: "https://urban-signal-engine.vercel.app"

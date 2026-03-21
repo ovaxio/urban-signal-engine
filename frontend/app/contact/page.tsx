@@ -4,8 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import s from "../landing.module.css";
 import MarketingNav from "@/components/layout/MarketingNav";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
+import { submitContact } from "@/lib/api";
 
 type FormState = "idle" | "sending" | "success" | "error";
 
@@ -19,20 +18,14 @@ export default function ContactPage() {
     setError("");
 
     const fd = new FormData(e.currentTarget);
-    const body = {
-      nom: fd.get("nom") as string,
-      email: fd.get("email") as string,
-      organisation: fd.get("organisation") as string,
-      message: fd.get("message") as string,
-    };
 
     try {
-      const res = await fetch(`${API_BASE}/contact`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      await submitContact({
+        nom: fd.get("nom") as string,
+        email: fd.get("email") as string,
+        organisation: fd.get("organisation") as string,
+        message: fd.get("message") as string,
       });
-      if (!res.ok) throw new Error(`${res.status}`);
       setState("success");
     } catch {
       setError("Une erreur est survenue. Réessayez ou écrivez-nous à contact@urbansignal.fr.");

@@ -99,3 +99,18 @@ export async function fetchForecastAccuracy(params?: { zone_id?: string; horizon
   if (!r.ok) throw new Error(`/zones/forecast/accuracy ${r.status}`);
   return r.json();
 }
+
+export async function submitContact(payload: {
+  nom: string;
+  email: string;
+  organisation: string;
+  message: string;
+}) {
+  const r = await fetch(`${BASE}/contact`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error(`/contact ${r.status}`);
+  return r.json();
+}
