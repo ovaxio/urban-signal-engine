@@ -60,12 +60,12 @@ async def delete_api_key(key_prefix: str, authorization: Optional[str] = Header(
 async def get_request_logs_endpoint(
     authorization: Optional[str] = Header(default=None),
     limit: int = 100,
-    status: Optional[int] = None,
+    status_code: Optional[int] = None,
     path: Optional[str] = None,
 ):
     """Historique des requêtes HTTP — filtre par status_code et/ou path."""
     _check_admin(authorization)
-    logs = get_request_logs(limit=limit, status_code=status, path_filter=path)
+    logs = get_request_logs(limit=limit, status_code=status_code, path_filter=path)
     return {"count": len(logs), "logs": logs}
 
 

@@ -243,13 +243,14 @@ async def add_security_headers(request: Request, call_next):
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
 
     if request.url.path != "/health":
+        client_ip = request.client.host if request.client else None
         log.info(
             "%s %s %d %.0fms %s",
             request.method,
             request.url.path,
             response.status_code,
             duration_ms,
-            request.client.host if request.client else "-",
+            client_ip or "-",
         )
         try:
             save_request_log(
@@ -257,7 +258,7 @@ async def add_security_headers(request: Request, call_next):
                 path=request.url.path,
                 status_code=response.status_code,
                 duration_ms=duration_ms,
-                client_ip=request.client.host if request.client else None,
+                client_ip=client_ip,
             )
         except Exception as e:
             log.warning("request_log write failed: %s", e)

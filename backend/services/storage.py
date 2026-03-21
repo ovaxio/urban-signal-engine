@@ -115,9 +115,7 @@ CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_al_ts       ON alerts_log (ts DESC);",
     "CREATE INDEX IF NOT EXISTS idx_fh_target   ON forecast_history (target_ts, zone_id);",
     "CREATE INDEX IF NOT EXISTS idx_fh_zone     ON forecast_history (zone_id, ts_forecast);",
-    "CREATE INDEX IF NOT EXISTS idx_rq_ts       ON request_logs (ts DESC);",
-    "CREATE INDEX IF NOT EXISTS idx_rq_path_ts  ON request_logs (path, ts DESC);",
-    "CREATE INDEX IF NOT EXISTS idx_rq_status   ON request_logs (status_code, ts DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_rq_ts ON request_logs (ts DESC);",
 ]
 
 # Migration : ajoute les colonnes raw si elles n'existent pas encore (base existante)
@@ -867,6 +865,7 @@ def get_request_logs(
     where = " AND ".join(conditions) if conditions else "1=1"
     params.append(limit)
     with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
         rows = conn.execute(
             f"SELECT ts, method, path, status_code, duration_ms, client_ip FROM request_logs WHERE {where} ORDER BY ts DESC LIMIT ?",
             params,
