@@ -28,3 +28,4 @@ Thumbs.db
 .idea/
 
 frontend/tsconfig.tsbuildinfo
+.claude/skills/sc*

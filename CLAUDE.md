@@ -422,3 +422,49 @@ Task: "Add a loading spinner to the dashboard"
 
 Claude does NOT create an ADR.
 Reason: routine UI implementation, no decision with future re-interpretation risk.
+
+## SoloCraft
+
+### stack
+- Backend: FastAPI 0.128 + SQLite + Python 3.11, déployé sur Render free tier
+- Frontend: Next.js 16 App Router + React 19 + TypeScript + CSS Modules
+- Dépendances clés: httpx, pydantic 2, slowapi, sentry-sdk | recharts, react-leaflet
+
+### target
+- Segment prioritaire: sécurité privée / événementielle Lyon
+- Revenus: rapport one-shot 390€ HT → abonnement 490€/mois
+- Segment secondaire (semaine 6+ seulement): logistique/livraison API 149€/mois
+- Stade: MVP — premier client payant pas encore signé
+
+### constraints
+- SQLite jusqu'au premier client payant — pas de Postgres avant
+- Pas de migration Tailwind sans instruction explicite
+- Pas de nouvelle dépendance sans justification
+- Validation manuelle uniquement — pas de suite de tests
+- Tous les appels API frontend passent par frontend/lib/api.ts
+- Pas de "use client" sans justification écrite
+
+### high-risk-zones
+- config.py WEIGHTS, LAMBDA, ALPHA, BETA, THETA
+- scoring.py — sigmoid center, formule alert/spread
+- ingestion.py — composition signal transport
+- storage.py + main.py calibration_loop
+- backend/scripts/seed_history.py
+
+### domain-agents
+When working on these domains within the `/sc` workflow, invoke the corresponding USE agent as domain expert:
+
+| Domain | Files touched | Agent to invoke |
+|--------|--------------|-----------------|
+| Scoring / calibration / signaux | `config.py`, `scoring.py`, `smoothing.py`, `storage.py`, `ingestion.py` | `scoring-guardian` |
+| Commercial / GTM / pricing | landing page, CLAUDE.md pricing, outreach copy | `use-gtm` |
+| Déploiement / ops | `render.yaml`, `main.py` lifespan, env vars, Vercel | `use-ops` |
+
+These agents are **advisory** — they provide validation and context, not blocking gates.
+Invoke as subagents (subagent_type: scoring-guardian / use-gtm / use-ops) in Phase 1 or Phase 2 of the `/sc` workflow.
+
+### decisions-dir
+docs/decisions/
+
+### adr-format
+Voir section "ADR format" dans ce CLAUDE.md — 30 lignes max, sections : Decision, Values, Rationale, Consequences, DO NOT, Triggers.
