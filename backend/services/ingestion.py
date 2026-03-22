@@ -356,12 +356,14 @@ async def fetch_incidents() -> tuple:
     Single pass : accumule scores par horizon ET détails d'affichage simultanément.
     Retourne :
         current  : Dict[str, float]               — score incident par zone maintenant
-        schedule : Dict[str, Dict[int, float]]    — score par zone à t+30/60/120 min
+        schedule : Dict[str, Dict[int, float]]    — score par zone à t+30/60/120/360/720/1440 min
         events   : Dict[str, List[dict]]           — détails événements actifs par zone
+        labels   : Dict[str, Dict[str, str]]       — top incident label par zone
     """
     neutral_c  = {z: 0.0 for z in ZONE_CENTROIDS}
-    neutral_s  = {z: {h: 0.0 for h in [30, 60, 120]} for z in ZONE_CENTROIDS}
+    neutral_s  = {z: {h: 0.0 for h in _INCIDENT_HORIZONS if h > 0} for z in ZONE_CENTROIDS}
     neutral_ev = {z: [] for z in ZONE_CENTROIDS}
+    neutral_lb = {}
 
     async with httpx.AsyncClient() as client:
         try:
@@ -374,12 +376,12 @@ async def fetch_incidents() -> tuple:
             data = r.json()
         except Exception as e:
             log.warning(f"[criter-incidents] Échec appel WFS: {e} → neutre")
-            return neutral_c, neutral_s, neutral_ev
+            return neutral_c, neutral_s, neutral_ev, neutral_lb
 
     features = data.get("features", [])
     if not features:
         log.info("[criter-incidents] Aucun événement actif")
-        return neutral_c, neutral_s, neutral_ev
+        return neutral_c, neutral_s, neutral_ev, neutral_lb
 
     now = datetime.datetime.now(datetime.timezone.utc)
 
