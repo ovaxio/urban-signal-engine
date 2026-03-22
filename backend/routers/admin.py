@@ -7,8 +7,14 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, EmailStr
 
+import services.scoring as _scoring
 from services.auth import generate_api_key, revoke_api_key, list_api_keys
-from services.storage import get_calibration_log, get_request_logs
+from services.storage import (
+    get_calibration_log, get_request_logs,
+    get_calibration_baselines, get_calibration_baselines_per_zone,
+    save_calibration_log, CALIBRATION_CUTOFF_TS,
+    patch_incident_history,
+)
 
 log = logging.getLogger("admin")
 
@@ -67,6 +73,31 @@ async def get_request_logs_endpoint(
     _check_admin(authorization)
     logs = get_request_logs(limit=limit, status_code=status_code, path_filter=path)
     return {"count": len(logs), "logs": logs}
+
+
+@router.post("/recalibrate")
+async def force_recalibrate(authorization: Optional[str] = Header(default=None)):
+    """Patch les raw_incident=0.0 corrompus puis force une recalibration immédiate."""
+    _check_admin(authorization)
+
+    patched = patch_incident_history()
+    log.info("Recalibration forcée : %d lignes raw_incident=0.0 patchées → 1.70", patched)
+
+    global_bl = {"event": {"mu": 0.2, "sigma": 0.3}}
+    baselines, n_rows = get_calibration_baselines(min_count=96)
+    if baselines:
+        global_bl.update(baselines)
+
+    zone_bls = get_calibration_baselines_per_zone(min_count=48)
+    _scoring.set_baselines(global_bl, zone_bls)
+    log.info("Recalibration forcée terminée : %d zones, %d relevés globaux", len(zone_bls), n_rows)
+
+    return {
+        "status": "ok",
+        "patched_incident_rows": patched,
+        "zones_recalibrated": len(zone_bls),
+        "global_rows": n_rows,
+    }
 
 
 @router.get("/calibration")

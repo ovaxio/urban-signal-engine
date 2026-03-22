@@ -873,6 +873,17 @@ def get_request_logs(
     return [dict(r) for r in rows]
 
 
+def patch_incident_history(db_path: Path = DB_PATH) -> int:
+    """Corrige les raw_incident=0.0 introduits par le bug fetch_incidents (3-tuple early return).
+    Remplace par 1.70 (baseline globale = aucun incident) pour les lignes source='live'.
+    Retourne le nombre de lignes patchées."""
+    with _get_conn(db_path) as conn:
+        cur = conn.execute(
+            "UPDATE signals_history SET raw_incident = 1.70 WHERE raw_incident = 0.0 AND source = 'live'"
+        )
+        return cur.rowcount
+
+
 def purge_old_request_logs(days: int = 7, db_path: Path = DB_PATH) -> int:
     """Supprime les logs de requêtes plus anciens que `days` jours. Retourne le nombre de lignes supprimées."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
