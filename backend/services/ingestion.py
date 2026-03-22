@@ -15,6 +15,7 @@ from config import (
 )
 from services.events import fetch_event_signals
 from services.smoothing import smooth_signals
+from services.scoring import _effective_baseline
 
 
 log = logging.getLogger("ingestion")
@@ -293,13 +294,10 @@ def _is_event_active_at(props: dict, target: datetime.datetime) -> bool:
         return True  # échec parsing → inclure par défaut
 
 
-_INCIDENT_BASELINE_MU = 1.70  # mu du baseline incident (scoring.py)
-
-
-def _zone_score_from_weights(weights: list) -> float:
+def _zone_score_from_weights(weights: list, fallback_mu: float = 0.0) -> float:
     if not weights:
-        # Aucun incident remonté → neutre (baseline), pas 0.0 qui tire z vers −1.3σ
-        return _INCIDENT_BASELINE_MU
+        # Aucun incident remonté → baseline zone-specific (pas 1.70 global)
+        return fallback_mu
     avg     = sum(weights) / len(weights)
     # Densité logarithmique : amortit la fragmentation TomTom
     # 1 incident → ×1.0, 3 → ×1.33, 5 → ×1.48, 10 → ×1.69, 20 → ×1.90
@@ -360,8 +358,8 @@ async def fetch_incidents() -> tuple:
         events   : Dict[str, List[dict]]           — détails événements actifs par zone
         labels   : Dict[str, Dict[str, str]]       — top incident label par zone
     """
-    neutral_c  = {z: 0.0 for z in ZONE_CENTROIDS}
-    neutral_s  = {z: {h: 0.0 for h in _INCIDENT_HORIZONS if h > 0} for z in ZONE_CENTROIDS}
+    neutral_c  = {z: _effective_baseline(z)["incident"]["mu"] for z in ZONE_CENTROIDS}
+    neutral_s  = {z: {h: _effective_baseline(z)["incident"]["mu"] for h in _INCIDENT_HORIZONS if h > 0} for z in ZONE_CENTROIDS}
     neutral_ev = {z: [] for z in ZONE_CENTROIDS}
     neutral_lb = {}
 
@@ -470,11 +468,12 @@ async def fetch_incidents() -> tuple:
     # Scores
     current: Dict[str, float] = {}
     for z in ZONE_CENTROIDS:
-        current[z] = _zone_score_from_weights(h_zone_weights[0][z])
+        mu_inc = _effective_baseline(z)["incident"]["mu"]
+        current[z] = _zone_score_from_weights(h_zone_weights[0][z], fallback_mu=mu_inc)
         log.info(f"[criter-incidents] zone={z} count={len(h_zone_weights[0][z])} score={current[z]}")
 
     schedule: Dict[str, Dict[int, float]] = {
-        z: {h: _zone_score_from_weights(h_zone_weights[h][z]) for h in _INCIDENT_HORIZONS if h > 0}
+        z: {h: _zone_score_from_weights(h_zone_weights[h][z], fallback_mu=_effective_baseline(z)["incident"]["mu"]) for h in _INCIDENT_HORIZONS if h > 0}
         for z in ZONE_CENTROIDS
     }
 
