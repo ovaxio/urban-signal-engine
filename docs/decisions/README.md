@@ -12,3 +12,4 @@ Read relevant ADR before modifying any component listed in Triggers.
 | [006](ADR-006-zone-centroids-source-of-truth.md) | Zone centroids source of truth | Accepted | 2026-03-21 | config.py ZONE_CENTROIDS, frontend/domain/constants.ts, ZoneMap.tsx |
 | [007](ADR-007-request-logging-strategy.md) | Request logging strategy (SQLite MVP) | Accepted | 2026-03-21 | main.py middleware, storage.py request_logs, external logging SaaS |
 | [008](ADR-008-incident-baseline-zone-specific.md) | Zone-specific incident baseline | Accepted | 2026-03-22 | ingestion.py fetch_incidents(), _zone_score_from_weights, _effective_baseline, ZONE_BASELINES |
+| [009](ADR-009-time-slot-baselines.md) | Time-slot baselines | Accepted | 2026-03-23 | storage.py calibration, scoring.py _effective_baseline, main.py _apply_calibration |

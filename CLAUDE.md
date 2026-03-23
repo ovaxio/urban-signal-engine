@@ -231,6 +231,7 @@ Decisions are in `docs/decisions/`. Read the relevant ADR before modifying any c
 | 006 | Zone centroids source of truth | config.py ZONE_CENTROIDS, frontend/domain/constants.ts, ZoneMap.tsx |
 | 007 | Request logging strategy (SQLite MVP) | main.py middleware, storage.py request_logs |
 | 008 | Zone-specific incident baseline | ingestion.py fetch_incidents(), _zone_score_from_weights, _effective_baseline |
+| 009 | Time-slot baselines | storage.py calibration, scoring.py _effective_baseline, main.py _apply_calibration |
 
 ## Target market (context for naming/comments)
 Primary: sécurité privée / événementielle Lyon (rapport événement 390€ HT one-shot → abonnement 490€/mois)

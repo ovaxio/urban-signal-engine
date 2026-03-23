@@ -92,7 +92,7 @@ async def refresh_scores(force: bool = False) -> List[dict]:
                         trend=trend,
                         signals=z.get("raw_signals"),
                         incident_schedule=incident_schedule.get(zid),
-                        bl=_effective_baseline(zid),
+                        bl=_effective_baseline(zid, now),
                         zone_id=zid,
                         weather_forecast=weather_fc,
                     )

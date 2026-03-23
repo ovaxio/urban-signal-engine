@@ -125,7 +125,7 @@ async def get_zone_forecast(zone_id: str, force_refresh: bool = Query(False)):
         trend=trend,
         signals=z.get("raw_signals"),
         incident_schedule=incident_schedule.get(zone_id),
-        bl=_effective_baseline(zone_id),
+        bl=_effective_baseline(zone_id, datetime.now(timezone.utc)),
         zone_id=zone_id,
         weather_forecast=weather_forecast,
     )

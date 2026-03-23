@@ -541,6 +541,148 @@ def get_calibration_baselines_per_zone(
     return result
 
 
+# ─── Calibration par créneau horaire ─────────────────────────────────────────
+# Corrige le biais "all-hours" : à 7h10, trafic V=1.0 est sous la moyenne
+# globale (inclut rush 8h-9h30) → z-scores négatifs amplifiés par φ.
+
+_TIME_SLOT_SQL = """
+    CASE
+        WHEN CAST(strftime('%H', ts) AS INTEGER) < 6  THEN 'nuit'
+        WHEN CAST(strftime('%H', ts) AS INTEGER) < 12 THEN 'matin'
+        WHEN CAST(strftime('%H', ts) AS INTEGER) < 18 THEN 'aprem'
+        ELSE 'soir'
+    END
+"""
+
+
+def get_calibration_baselines_by_slot(
+    min_count: int = 200,
+    db_path: Path = DB_PATH,
+) -> Dict[str, Dict[str, Dict[str, float]]]:
+    """
+    Calcule les baselines globales segmentées par créneau horaire.
+    Retourne un dict slot → signal → {mu, sigma}.
+    Les slots avec moins de min_count relevés sont ignorés (fallback global).
+    Le signal event est exclu (non-stationnaire).
+    Filtre : source='live', ts >= CALIBRATION_CUTOFF_TS.
+    """
+    MIN_SIGMA = {
+        "traffic":   0.15,
+        "weather":   0.10,
+        "transport": 0.20,
+        "incident":  0.15,
+    }
+    _cal_where = "AND source = 'live' AND ts >= ?"
+    _cal_params: list = [CALIBRATION_CUTOFF_TS]
+
+    signals = ("traffic", "weather", "transport", "incident")
+    cols = []
+    for s in signals:
+        col = f"raw_{s}"
+        cols.append(f"COUNT({col}) AS cnt_{s}")
+        cols.append(f"AVG({col}) AS mu_{s}")
+        cols.append(f"AVG({col}*{col}) - AVG({col})*AVG({col}) AS var_{s}")
+
+    sql = f"""
+        SELECT
+            {_TIME_SLOT_SQL} AS slot,
+            COUNT(*) AS n,
+            {', '.join(cols)}
+        FROM signals_history
+        WHERE raw_traffic IS NOT NULL {_cal_where}
+        GROUP BY slot
+    """
+
+    result: Dict[str, Dict[str, Dict[str, float]]] = {}
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, _cal_params).fetchall()
+
+    for row in rows:
+        if row["n"] < min_count:
+            logger.info("Slot %s ignoré : %d/%d relevés.", row["slot"], row["n"], min_count)
+            continue
+        slot = row["slot"]
+        slot_bl: Dict[str, Dict[str, float]] = {}
+        for s in signals:
+            if row[f"cnt_{s}"] and row[f"cnt_{s}"] >= 50 and row[f"mu_{s}"] is not None:
+                variance = max(row[f"var_{s}"] or 0.0, 0.0)
+                sigma = max(variance ** 0.5, MIN_SIGMA[s])
+                slot_bl[s] = {"mu": round(row[f"mu_{s}"], 4), "sigma": round(sigma, 4)}
+        if slot_bl:
+            result[slot] = slot_bl
+
+    logger.info("Baselines par slot : %d slots calibrés — %s",
+                len(result), {s: {k: v["mu"] for k, v in bl.items()} for s, bl in result.items()})
+    return result
+
+
+def get_calibration_baselines_per_zone_by_slot(
+    min_count: int = 30,
+    db_path: Path = DB_PATH,
+) -> Dict[str, Dict[str, Dict[str, Dict[str, float]]]]:
+    """
+    Calcule les baselines par zone et créneau horaire.
+    Retourne un dict zone_id → slot → signal → {mu, sigma}.
+    Les combinaisons zone+slot avec moins de min_count relevés sont ignorées.
+    Le signal event est exclu (non-stationnaire).
+    Filtre : source='live', ts >= CALIBRATION_CUTOFF_TS.
+    """
+    MIN_SIGMA = {
+        "traffic":   0.15,
+        "weather":   0.10,
+        "transport": 0.20,
+        "incident":  0.15,
+    }
+    _cal_where = "AND source = 'live' AND ts >= ?"
+    _cal_params: list = [CALIBRATION_CUTOFF_TS]
+
+    signals = ("traffic", "weather", "transport", "incident")
+    cols = []
+    for s in signals:
+        col = f"raw_{s}"
+        cols.append(f"AVG({col}) AS mu_{s}")
+        cols.append(f"AVG({col}*{col}) - AVG({col})*AVG({col}) AS var_{s}")
+
+    sql = f"""
+        SELECT
+            zone_id,
+            {_TIME_SLOT_SQL} AS slot,
+            COUNT(*) AS n,
+            {', '.join(cols)}
+        FROM signals_history
+        WHERE raw_traffic IS NOT NULL {_cal_where}
+        GROUP BY zone_id, slot
+    """
+
+    result: Dict[str, Dict[str, Dict[str, Dict[str, float]]]] = {}
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, _cal_params).fetchall()
+
+    for row in rows:
+        if row["n"] < min_count:
+            continue
+        zone_id = row["zone_id"]
+        slot = row["slot"]
+        zone_slot_bl: Dict[str, Dict[str, float]] = {}
+        for s in signals:
+            mu = row[f"mu_{s}"]
+            var = row[f"var_{s}"] or 0.0
+            if mu is None:
+                continue
+            sigma = max(max(var, 0.0) ** 0.5, MIN_SIGMA[s])
+            zone_slot_bl[s] = {"mu": round(mu, 4), "sigma": round(sigma, 4)}
+        if zone_slot_bl:
+            result.setdefault(zone_id, {})[slot] = zone_slot_bl
+
+    logger.info(
+        "Baselines zone+slot : %d zones avec données slot.",
+        len(result),
+    )
+    return result
+
+
 # ─── Calibration Log ─────────────────────────────────────────────────────────
 
 def save_calibration_log(

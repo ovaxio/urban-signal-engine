@@ -124,6 +124,30 @@ BASELINE = {
 # Structure : zone_id → signal → {mu, sigma}
 ZONE_BASELINES: Dict[str, Dict[str, Dict[str, float]]] = {}
 
+# ── Baselines segmentées par créneau horaire ─────────────────────────────────
+# Corrige le biais "all-hours" : à 7h10, le trafic (V=1.0) est sous la moyenne
+# globale (mu~1.05) qui inclut le rush 8h-9h30. Les z-scores négatifs sont
+# amplifiés par φ=1.55, poussant les scores à 21-25 au lieu de ~29.
+# Avec des baselines par slot, chaque créneau a son propre mu/sigma.
+TIME_SLOTS = [
+    ("nuit",   0, 6),    # 00:00 – 05:59
+    ("matin",  6, 12),   # 06:00 – 11:59
+    ("aprem", 12, 18),   # 12:00 – 17:59
+    ("soir",  18, 24),   # 18:00 – 23:59
+]
+
+def time_slot(hour: int) -> str:
+    """Retourne le créneau horaire pour segmentation des baselines."""
+    for name, start, end in TIME_SLOTS:
+        if start <= hour < end:
+            return name
+    return "nuit"
+
+# Structure : slot → signal → {mu, sigma}
+BASELINE_BY_SLOT: Dict[str, Dict[str, Dict[str, float]]] = {}
+# Structure : zone_id → slot → signal → {mu, sigma}
+ZONE_BASELINES_BY_SLOT: Dict[str, Dict[str, Dict[str, Dict[str, float]]]] = {}
+
 
 def set_baselines(
     global_bl: Dict[str, Dict[str, float]],
@@ -138,12 +162,43 @@ def set_baselines(
     ZONE_BASELINES.update(zone_bl)
 
 
-def _effective_baseline(zone_id: str) -> Dict[str, Dict[str, float]]:
-    """Retourne le baseline effectif pour une zone : zone-specific si dispo, global sinon."""
+def set_slot_baselines(
+    slot_bl: Dict[str, Dict[str, Dict[str, float]]],
+    zone_slot_bl: Dict[str, Dict[str, Dict[str, Dict[str, float]]]],
+) -> None:
+    """Met à jour les baselines segmentées par créneau horaire."""
+    BASELINE_BY_SLOT.clear()
+    BASELINE_BY_SLOT.update(slot_bl)
+    ZONE_BASELINES_BY_SLOT.clear()
+    ZONE_BASELINES_BY_SLOT.update(zone_slot_bl)
+
+
+def _effective_baseline(zone_id: str, dt: datetime = None) -> Dict[str, Dict[str, float]]:
+    """Retourne le baseline effectif pour une zone + créneau horaire.
+    Fallback : zone+slot → slot global → zone global → BASELINE."""
+    if dt is not None:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        hour = dt.astimezone(LYON_TZ).hour
+        slot = time_slot(hour)
+
+        # 1. Zone + slot
+        zone_slot = ZONE_BASELINES_BY_SLOT.get(zone_id, {}).get(slot)
+        if zone_slot:
+            return {sig: zone_slot.get(sig, BASELINE[sig]) for sig in BASELINE}
+
+        # 2. Slot global
+        slot_bl = BASELINE_BY_SLOT.get(slot)
+        if slot_bl:
+            return {sig: slot_bl.get(sig, BASELINE[sig]) for sig in BASELINE}
+
+    # 3. Zone global (fallback existant)
     zone_bl = ZONE_BASELINES.get(zone_id, {})
-    if not zone_bl:
-        return BASELINE
-    return {sig: zone_bl.get(sig, BASELINE[sig]) for sig in BASELINE}
+    if zone_bl:
+        return {sig: zone_bl.get(sig, BASELINE[sig]) for sig in BASELINE}
+
+    # 4. BASELINE hardcodé
+    return BASELINE
 
 NEIGHBORS = {
     "part-dieu":    ["brotteaux","villette","montchat","guillotiere"],
@@ -624,7 +679,7 @@ def compute_forecast(
     return results
 
 def score_zone(zone_id: str, signals: dict, alert_map: dict, dt: datetime = None) -> dict:
-    bl      = _effective_baseline(zone_id)
+    bl      = _effective_baseline(zone_id, dt)
     phi     = compute_phi(dt)
     risk    = compute_risk(signals, phi, bl)
     anomaly = compute_anomaly(signals, bl)
@@ -657,7 +712,7 @@ def score_zone(zone_id: str, signals: dict, alert_map: dict, dt: datetime = None
 def score_all_zones(all_signals: Dict[str, Dict[str, float]], dt: datetime = None) -> List[dict]:
     alert_map = {}
     for zone_id, signals in all_signals.items():
-        bl      = _effective_baseline(zone_id)
+        bl      = _effective_baseline(zone_id, dt)
         phi     = compute_phi(dt)
         risk    = compute_risk(signals, phi, bl)
         anomaly = compute_anomaly(signals, bl)

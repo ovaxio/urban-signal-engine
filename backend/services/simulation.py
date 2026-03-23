@@ -413,7 +413,7 @@ async def simulate_event_profile(
 
         all_signals: Dict[str, Dict[str, float]] = {}
         for zone_id, ev_sig in event_signals.items():
-            bl = _effective_baseline(zone_id)
+            bl = _effective_baseline(zone_id, dt)
             traffic_base = bl["traffic"]["mu"] * phi_t * (1 + ev_sig * 0.8)
             transport_base = bl["transport"]["mu"] * (1 + ev_sig * 0.5 * phi_t)
             incident_base = bl["incident"]["mu"] * (1 + ev_sig * 0.2)
@@ -431,7 +431,7 @@ async def simulate_event_profile(
 
         for zone_id in ZONE_CENTROIDS:
             z = score_map[zone_id]
-            bl = _effective_baseline(zone_id)
+            bl = _effective_baseline(zone_id, dt)
             sigs = all_signals[zone_id]
             zones_result[zone_id]["hourly"].append({
                 "hour": hour,

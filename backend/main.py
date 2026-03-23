@@ -34,6 +34,7 @@ from routers.reports import router as reports_router
 from config import CACHE_TTL_SECONDS
 from services.storage import (
     init_db, get_calibration_baselines, get_calibration_baselines_per_zone,
+    get_calibration_baselines_by_slot, get_calibration_baselines_per_zone_by_slot,
     save_calibration_log, CALIBRATION_CUTOFF_TS, save_request_log, purge_old_request_logs,
 )
 from services.auth import init_auth_db
@@ -142,6 +143,13 @@ def _apply_calibration(min_count: int = 96) -> None:
 
     scoring.set_baselines(global_bl, zone_baselines)
     log.info("Recalibration par zone : %d zones calibrées.", len(zone_baselines))
+
+    # Baselines segmentées par créneau horaire (nuit/matin/aprem/soir)
+    slot_bl = get_calibration_baselines_by_slot(min_count=min_count // 4)
+    zone_slot_bl = get_calibration_baselines_per_zone_by_slot(min_count=min_count // 8)
+    scoring.set_slot_baselines(slot_bl, zone_slot_bl)
+    log.info("Recalibration par slot : %d slots globaux, %d zones avec slots.",
+             len(slot_bl), len(zone_slot_bl))
 
     # Persist calibration log
     save_calibration_log(cal_entries)

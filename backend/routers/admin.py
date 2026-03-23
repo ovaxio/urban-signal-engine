@@ -12,6 +12,7 @@ from services.auth import generate_api_key, revoke_api_key, list_api_keys
 from services.storage import (
     get_calibration_log, get_request_logs,
     get_calibration_baselines, get_calibration_baselines_per_zone,
+    get_calibration_baselines_by_slot, get_calibration_baselines_per_zone_by_slot,
     save_calibration_log, CALIBRATION_CUTOFF_TS,
     patch_incident_history,
 )
@@ -90,13 +91,19 @@ async def force_recalibrate(authorization: Optional[str] = Header(default=None))
 
     zone_bls = get_calibration_baselines_per_zone(min_count=48)
     _scoring.set_baselines(global_bl, zone_bls)
-    log.info("Recalibration forcée terminée : %d zones, %d relevés globaux", len(zone_bls), n_rows)
+
+    slot_bl = get_calibration_baselines_by_slot(min_count=24)
+    zone_slot_bl = get_calibration_baselines_per_zone_by_slot(min_count=12)
+    _scoring.set_slot_baselines(slot_bl, zone_slot_bl)
+    log.info("Recalibration forcée terminée : %d zones, %d relevés globaux, %d slots",
+             len(zone_bls), n_rows, len(slot_bl))
 
     return {
         "status": "ok",
         "patched_incident_rows": patched,
         "zones_recalibrated": len(zone_bls),
         "global_rows": n_rows,
+        "slots_calibrated": len(slot_bl),
     }
 
 
