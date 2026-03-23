@@ -8,6 +8,7 @@ set -e
 
 DB="data/urban_signal.db"
 SEED="data/seed_signals_history.csv.gz"
+SEED_FORECAST="data/seed_forecast_history.csv.gz"
 SNAPSHOT="data/calibration_snapshot.json"
 
 if [ ! -f "$DB" ]; then
@@ -23,6 +24,13 @@ sqlite3 -header -csv "$DB" "SELECT * FROM signals_history" | gzip > "$SEED"
 SIZE=$(ls -lh "$SEED" | awk '{print $5}')
 echo "Seed regenere : $SEED ($SIZE, $ROWS lignes)"
 
+# Forecast history
+FC_ROWS=$(sqlite3 "$DB" "SELECT COUNT(*) FROM forecast_history")
+echo "Export forecast_history ($FC_ROWS lignes) -> $SEED_FORECAST"
+sqlite3 -header -csv "$DB" "SELECT * FROM forecast_history" | gzip > "$SEED_FORECAST"
+FC_SIZE=$(ls -lh "$SEED_FORECAST" | awk '{print $5}')
+echo "Seed forecast regenere : $SEED_FORECAST ($FC_SIZE, $FC_ROWS lignes)"
+
 # Calibration snapshot (ADR-015)
 echo "Export calibration snapshot -> $SNAPSHOT"
 cd "$(dirname "$0")/.."
@@ -37,7 +45,7 @@ else:
 cd - > /dev/null
 
 # Stage automatiquement pour le prochain commit
-git add "$SEED"
+git add "$SEED" "$SEED_FORECAST"
 if [ -f "$SNAPSHOT" ]; then
   git add "$SNAPSHOT"
 fi
