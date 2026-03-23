@@ -42,6 +42,11 @@ export type TransportDetail = {
   fallback: boolean;
 };
 
+export type ZoneRecommendation = {
+  level: number;   // 0=CALME, 1=MODÉRÉ, 2=TENDU, 3=CRITIQUE
+  action: string;
+};
+
 export type ZoneDetail = {
   zone_id: string;
   zone_name: string;
@@ -56,6 +61,10 @@ export type ZoneDetail = {
   sim_events?: string[];
   transport_detail?: TransportDetail;
   weights?: Record<string, number>;
+  typical_score?: number | null;
+  delta_vs_typical?: number | null;
+  delta_label?: string | null;
+  recommendation?: ZoneRecommendation;
 };
 
 export type Alert = {

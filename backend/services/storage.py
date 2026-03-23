@@ -686,6 +686,47 @@ def get_history_range(
     return [dict(r) for r in rows]
 
 
+def get_typical_score(
+    zone_id: str,
+    day_type: str,
+    hour: int,
+    min_count: int = 5,
+    db_path: Path = DB_PATH,
+) -> Optional[float]:
+    """
+    Retourne le score moyen historique pour une zone, un type de jour et une heure.
+    Permet de comparer le score actuel à la "normale" pour ce créneau.
+    Retourne None si pas assez de données (< min_count relevés).
+    """
+    where_clauses = [
+        "zone_id = ?",
+        "CAST(strftime('%H', ts) AS INTEGER) = ?",
+    ]
+    params: list = [zone_id, hour]
+
+    if day_type == "weekend":
+        where_clauses.append("CAST(strftime('%w', ts) AS INTEGER) IN (0, 6)")
+    elif day_type == "mercredi":
+        where_clauses.append("CAST(strftime('%w', ts) AS INTEGER) = 3")
+    elif day_type in ("semaine", "vacances"):
+        where_clauses.append("CAST(strftime('%w', ts) AS INTEGER) IN (1, 2, 4, 5)")
+
+    where = " AND ".join(where_clauses)
+    sql = f"""
+        SELECT AVG(urban_score) AS avg_score, COUNT(*) AS n
+        FROM signals_history
+        WHERE {where}
+    """
+
+    with _get_conn(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(sql, params).fetchone()
+
+    if not row or row["n"] < min_count or row["avg_score"] is None:
+        return None
+    return round(row["avg_score"], 1)
+
+
 def get_hourly_signal_profiles(
     zone_id: str,
     day_type: str = None,

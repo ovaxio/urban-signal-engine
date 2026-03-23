@@ -8,7 +8,8 @@ from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 
 from services.orchestrator import refresh_scores, get_cache_data, get_cache_state, compute_trend
 from services.scoring import compute_forecast, NEIGHBORS, ZONE_NAMES, BASELINE, _effective_baseline, score_all_zones
-from services.storage import get_zone_history, get_recent_alerts
+from services.storage import get_zone_history, get_recent_alerts, get_typical_score
+from services.calendar_utils import day_type as get_day_type
 from services.forecast_storage import save_forecast_history, get_forecast_accuracy
 from services.events import compute_event_signals, STATIC_EVENTS
 from services.simulation import simulate_event_profile
@@ -67,6 +68,28 @@ async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
         }
         for r in rss_incidents if r.zone_id == zone_id
     ]
+    # ── Contexte décisionnel (delta vs typical + recommandation) ────────────
+    now = datetime.now(timezone.utc)
+    dt = get_day_type(now)
+    hour = now.hour
+    typical = get_typical_score(zone_id, dt, hour)
+    delta = round(z["urban_score"] - typical, 1) if typical is not None else None
+
+    RECOMMENDATIONS = {
+        "CALME":    {"level": 0, "action": "Effectif standard. Aucune action requise."},
+        "MODÉRÉ":   {"level": 1, "action": "Attention recommandée. Surveiller l'évolution des signaux."},
+        "TENDU":    {"level": 2, "action": "Renforcement du dispositif recommandé. Surveillance active des zones voisines."},
+        "CRITIQUE": {"level": 3, "action": "Plan d'urgence. Déploiement immédiat de renforts sur la zone."},
+    }
+    recommendation = RECOMMENDATIONS.get(z["level"], RECOMMENDATIONS["CALME"])
+
+    # Enrichir le delta dans la recommandation si disponible
+    delta_text = ""
+    if delta is not None:
+        sign = "+" if delta > 0 else ""
+        day_labels = {"semaine": "un jour de semaine", "mercredi": "un mercredi", "vacances": "les vacances", "weekend": "un weekend"}
+        delta_text = f"{sign}{delta:.0f} pts vs moyenne {day_labels.get(dt, dt)} à {hour}h"
+
     return {
         **{k: v for k, v in z.items() if k != "alert"},
         "explanation":      explanation,
@@ -75,6 +98,10 @@ async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
         "transport_detail": transport_detail.get(zone_id),
         "weights":          {k: round(v * 100) for k, v in WEIGHTS.items()},
         "rss_context":      rss_context,
+        "typical_score":    typical,
+        "delta_vs_typical": delta,
+        "delta_label":      delta_text if delta_text else None,
+        "recommendation":   recommendation,
     }
 
 
