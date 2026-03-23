@@ -366,9 +366,12 @@ def compute_phi(dt: datetime = None) -> float:
     return _phi_from_breakpoints(breakpoints, t)
 
 
-# Signaux pour lesquels 0.0 = "pas d'activité" (pas "plus calme que d'habitude").
-# Leur z négatif ne doit pas réduire le risk — clampé à 0.
-_NEUTRAL_WHEN_LOW = frozenset({"weather", "event", "incident"})
+# Signaux pour lesquels un z négatif ne doit pas réduire le risk — clampé à 0.
+# weather/event/incident : 0.0 = "pas d'activité" (pas "plus calme que d'habitude").
+# traffic/transport : un trafic fluide ou une bonne desserte TCL ne réduit pas la tension.
+# Sans ce clamp, les zones structurellement calmes (presquile, fourviere) sont sous-scorées
+# car leurs z négatifs sont amplifiés par φ(rush) ≈ 1.6.
+_NEUTRAL_WHEN_LOW = frozenset({"weather", "event", "incident", "traffic", "transport"})
 
 
 def compute_risk(signals: dict, phi: float, bl: Dict = None) -> float:

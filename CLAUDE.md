@@ -92,7 +92,7 @@ Sigmoid centered at raw=1.5 (k=0.6):
 - 72-100: CRITIQUE — converging strong signals
 
 ### Components
-- **RISK** = φ(t) × Σ(wₛ × zₛ) — weighted risk modulated by temporal profile
+- **RISK** = φ(t) × Σ(wₛ × max(zₛ, 0)) — weighted risk, all z clampés ≥0 (ADR-010)
 - **ANOMALY** = Σ(αₛ × max(zₛ, 0)) — individual peak detection (ReLU, positive only)
 - **CONV** = min(Σ(βₖ × gate(zₐ) × gate(zᵦ)), 2.0) — signal convergence (co-occurrence)
 - **SPREAD** = K × Σ max(alert_neighbor, 0) — spatial diffusion (contagion, not relief)
@@ -232,6 +232,7 @@ Decisions are in `docs/decisions/`. Read the relevant ADR before modifying any c
 | 007 | Request logging strategy (SQLite MVP) | main.py middleware, storage.py request_logs |
 | 008 | Zone-specific incident baseline | ingestion.py fetch_incidents(), _zone_score_from_weights, _effective_baseline |
 | 009 | Time-slot baselines | storage.py calibration, scoring.py _effective_baseline, main.py _apply_calibration |
+| 010 | Clamp z négatifs traffic/transport dans RISK | scoring.py compute_risk, _NEUTRAL_WHEN_LOW, RISK formula |
 
 ## Target market (context for naming/comments)
 Primary: sécurité privée / événementielle Lyon (rapport événement 390€ HT one-shot → abonnement 490€/mois)
