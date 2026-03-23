@@ -36,6 +36,7 @@ from services.storage import (
     init_db, get_calibration_baselines, get_calibration_baselines_per_zone,
     get_calibration_baselines_by_slot, get_calibration_baselines_per_zone_by_slot,
     save_calibration_log, CALIBRATION_CUTOFF_TS, save_request_log, purge_old_request_logs,
+    load_calibration_snapshot,
 )
 from services.auth import init_auth_db
 import services.scoring as scoring
@@ -103,6 +104,11 @@ def _apply_calibration(min_count: int = 96) -> None:
     incident sont calibrés automatiquement depuis l'historique Criter.
     Filtre : source='live', ts >= CALIBRATION_CUTOFF_TS.
     Appelé au démarrage et toutes les 7 jours à 3h00.
+
+    Fallback chain (ADR-015):
+      1. Live data calibration (>= min_count rows) — PRIMARY
+      2. calibration_snapshot.json (if exists and valid) — FALLBACK
+      3. Hardcoded BASELINE in scoring.py — LAST RESORT
     """
     from datetime import datetime, timezone as _tz
 
@@ -111,7 +117,33 @@ def _apply_calibration(min_count: int = 96) -> None:
 
     baselines, n_rows = get_calibration_baselines(min_count=min_count)
     if not baselines:
-        log.info("Recalibration : données insuffisantes (%d relevés qualifiés), baselines conservées.", n_rows)
+        log.info("Recalibration : données insuffisantes (%d relevés qualifiés), tentative snapshot fallback.", n_rows)
+
+        # ── Snapshot fallback (ADR-015) ──────────────────────────────────
+        snapshot = load_calibration_snapshot()
+        if snapshot:
+            log.info("Applying calibration from snapshot (generated_at=%s).", snapshot["generated_at"])
+            for signal, values in snapshot["baseline"].items():
+                global_bl[signal] = values
+            zone_baselines = snapshot.get("zone_baselines", {})
+            scoring.set_baselines(global_bl, zone_baselines)
+            log.info("Snapshot applied: %d global signals, %d zones.", len(snapshot["baseline"]), len(zone_baselines))
+
+            slot_bl = snapshot.get("baseline_by_slot", {})
+            zone_slot_bl = snapshot.get("zone_baselines_by_slot", {})
+            scoring.set_slot_baselines(slot_bl, zone_slot_bl)
+            log.info("Snapshot slots: %d slots globaux, %d zones avec slots.",
+                     len(slot_bl), len(zone_slot_bl))
+
+            _calibration_meta["last_calibrated_at"] = snapshot["generated_at"]
+            _calibration_meta["row_count"] = n_rows
+            _calibration_meta["zones_calibrated"] = len(zone_baselines)
+            _calibration_meta["source"] = "snapshot"
+            return
+        else:
+            log.warning("No snapshot available — falling back to hardcoded BASELINE.")
+            _calibration_meta["source"] = "hardcoded"
+            return
     else:
         for signal, values in baselines.items():
             old = scoring.BASELINE.get(signal, {})
@@ -158,6 +190,7 @@ def _apply_calibration(min_count: int = 96) -> None:
     _calibration_meta["last_calibrated_at"] = datetime.now(_tz.utc).isoformat(timespec="seconds")
     _calibration_meta["row_count"] = n_rows
     _calibration_meta["zones_calibrated"] = len(zone_baselines)
+    _calibration_meta["source"] = "live"
 
 
 async def _backup_loop():
@@ -311,6 +344,7 @@ async def health():
         "baseline":  scoring.BASELINE,
         "calibration": {
             "last_calibrated_at": _calibration_meta.get("last_calibrated_at"),
+            "source": _calibration_meta.get("source", "unknown"),
             "cutoff_ts": CALIBRATION_CUTOFF_TS,
             "row_count": _calibration_meta.get("row_count"),
             "zones_with_custom_baseline": _calibration_meta.get("zones_calibrated", 0),

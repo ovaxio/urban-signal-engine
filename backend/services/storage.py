@@ -5,6 +5,7 @@ Persistence SQLite pour signaux et scores historiques.
 
 import csv
 import gzip
+import json
 import sqlite3
 import logging
 from contextlib import contextmanager
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).parent.parent / "data" / "urban_signal.db"
 SEED_PATH = Path(__file__).parent.parent / "data" / "seed_signals_history.csv.gz"
+CALIBRATION_SNAPSHOT_PATH = Path(__file__).parent.parent / "data" / "calibration_snapshot.json"
 
 # Transport signal inverted around this date (old activity model → disruption model).
 # Data before this timestamp uses the pre-inversion transport values.
@@ -1128,3 +1130,98 @@ def _build_row(entry: dict[str, Any], ts_fallback: str) -> dict[str, Any]:
         "incident_label":  entry.get("incident_label"),
         "incident_type":   entry.get("incident_type"),
     }
+
+
+# ─── Calibration Snapshot (export/import) ────────────────────────────────────
+
+_SNAPSHOT_MAX_AGE_DAYS = 14
+
+
+def export_calibration_snapshot(
+    db_path: Path = DB_PATH,
+    out_path: Path = CALIBRATION_SNAPSHOT_PATH,
+    min_count: int = 96,
+) -> Optional[Path]:
+    """
+    Exporte les baselines calibrées (global, zone, slot, zone+slot)
+    depuis la DB locale vers un fichier JSON.
+    Retourne le chemin du fichier créé, ou None si données insuffisantes.
+    """
+    baselines, n_rows = get_calibration_baselines(min_count=min_count, db_path=db_path)
+    if not baselines:
+        logger.warning("Snapshot export skipped: insufficient live data (%d rows).", n_rows)
+        return None
+
+    zone_bl = get_calibration_baselines_per_zone(min_count=min_count // 2, db_path=db_path)
+    slot_bl = get_calibration_baselines_by_slot(min_count=min_count // 4, db_path=db_path)
+    zone_slot_bl = get_calibration_baselines_per_zone_by_slot(min_count=min_count // 8, db_path=db_path)
+
+    snapshot = {
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "baseline": baselines,
+        "zone_baselines": zone_bl,
+        "baseline_by_slot": slot_bl,
+        "zone_baselines_by_slot": zone_slot_bl,
+    }
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(snapshot, f, indent=2, ensure_ascii=False)
+
+    logger.info(
+        "Calibration snapshot exported: %s (%d global signals, %d zones, %d slots).",
+        out_path.name, len(baselines), len(zone_bl), len(slot_bl),
+    )
+    return out_path
+
+
+def load_calibration_snapshot(
+    path: Path = CALIBRATION_SNAPSHOT_PATH,
+) -> Optional[Dict[str, Any]]:
+    """
+    Charge le snapshot de calibration depuis un fichier JSON.
+    Retourne None si le fichier n'existe pas ou est invalide.
+    Logue un warning si le snapshot a plus de _SNAPSHOT_MAX_AGE_DAYS jours.
+    """
+    if not path.exists():
+        logger.info("No calibration snapshot found at %s.", path)
+        return None
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            snapshot = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Failed to load calibration snapshot: %s", e)
+        return None
+
+    # Validate required keys
+    required_keys = {"generated_at", "baseline", "zone_baselines", "baseline_by_slot", "zone_baselines_by_slot"}
+    if not required_keys.issubset(snapshot.keys()):
+        missing = required_keys - snapshot.keys()
+        logger.warning("Calibration snapshot missing keys: %s", missing)
+        return None
+
+    # Validate baseline has at least one signal
+    if not snapshot.get("baseline"):
+        logger.warning("Calibration snapshot has empty baseline.")
+        return None
+
+    # Age check
+    try:
+        gen_dt = datetime.fromisoformat(snapshot["generated_at"])
+        if gen_dt.tzinfo is None:
+            gen_dt = gen_dt.replace(tzinfo=timezone.utc)
+        age_days = (datetime.now(timezone.utc) - gen_dt).total_seconds() / 86400
+        if age_days > _SNAPSHOT_MAX_AGE_DAYS:
+            logger.warning(
+                "Calibration snapshot is %.1f days old (max recommended: %d). Using anyway as fallback.",
+                age_days, _SNAPSHOT_MAX_AGE_DAYS,
+            )
+    except (ValueError, TypeError) as e:
+        logger.warning("Cannot parse snapshot generated_at: %s", e)
+
+    logger.info(
+        "Calibration snapshot loaded: generated_at=%s, %d global signals, %d zones.",
+        snapshot.get("generated_at"), len(snapshot.get("baseline", {})), len(snapshot.get("zone_baselines", {})),
+    )
+    return snapshot

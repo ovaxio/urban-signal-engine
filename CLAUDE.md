@@ -237,6 +237,7 @@ Decisions are in `docs/decisions/`. Read the relevant ADR before modifying any c
 | 012 | Forecast short-horizon: weighted average replaces max | scoring.py _forecast_short_horizon, forecast bias, scenario weights |
 | 013 | Incident decay for extended forecast horizons | scoring.py _forecast_extended_horizon, config.py INCIDENT_FORECAST_HALFLIFE_MIN |
 | 014 | Harden incident_surprise detection thresholds | forecast_storage.py evaluate_forecasts, flag_incident_surprises |
+| 015 | Calibration snapshot fallback | main.py _apply_calibration, storage.py calibration, refresh_seed.sh, Render deploy |
 
 ## Target market (context for naming/comments)
 Primary: sécurité privée / événementielle Lyon (rapport événement 390€ HT one-shot → abonnement 490€/mois)
