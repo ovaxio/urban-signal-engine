@@ -233,6 +233,7 @@ Decisions are in `docs/decisions/`. Read the relevant ADR before modifying any c
 | 008 | Zone-specific incident baseline | ingestion.py fetch_incidents(), _zone_score_from_weights, _effective_baseline |
 | 009 | Time-slot baselines | storage.py calibration, scoring.py _effective_baseline, main.py _apply_calibration |
 | 010 | Clamp z négatifs traffic/transport dans RISK | scoring.py compute_risk, _NEUTRAL_WHEN_LOW, RISK formula |
+| 011 | Remove double-phi in simulation + align report thresholds | simulation.py, reports.py pre_event_report, _recommendation_level, DPS staffing |
 
 ## Target market (context for naming/comments)
 Primary: sécurité privée / événementielle Lyon (rapport événement 390€ HT one-shot → abonnement 490€/mois)

@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 from config import ZONE_CENTROIDS
 from services.scoring import (
     BASELINE, _effective_baseline, score_all_zones, score_level,
-    normalize, ZONE_NAMES, compute_phi,
+    normalize, ZONE_NAMES,
 )
 from services.events import compute_event_signals, STATIC_EVENTS
 
@@ -398,7 +398,6 @@ async def simulate_event_profile(
     for hour in SIM_HOURS:
         # Build signals for all zones at this hour
         dt = datetime.fromisoformat(f"{target_date}T{hour:02d}:00:00+00:00")
-        phi = compute_phi(dt)
 
         # Per-hour event signals (respects event hours + ramp)
         event_signals = _hourly_event_signals(hour)
@@ -407,15 +406,11 @@ async def simulate_event_profile(
         if hour in weather_data:
             weather_score = weather_data[hour]["weather_score"]
 
-        # Dampened φ ratio for traffic variation
-        # φ already amplifies RISK inside scoring — we only need gentle raw variation here.
-        phi_t = 1.0 + (phi - 1.0) * 0.5
-
         all_signals: Dict[str, Dict[str, float]] = {}
         for zone_id, ev_sig in event_signals.items():
             bl = _effective_baseline(zone_id, dt)
-            traffic_base = bl["traffic"]["mu"] * phi_t * (1 + ev_sig * 0.8)
-            transport_base = bl["transport"]["mu"] * (1 + ev_sig * 0.5 * phi_t)
+            traffic_base = bl["traffic"]["mu"] * (1 + ev_sig * 0.8)
+            transport_base = bl["transport"]["mu"] * (1 + ev_sig * 0.5)
             incident_base = bl["incident"]["mu"] * (1 + ev_sig * 0.2)
             all_signals[zone_id] = {
                 "traffic": min(traffic_base, 3.0),

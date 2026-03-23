@@ -269,12 +269,12 @@ _RECO_TEMPLATES = {
         "Vigilance renforcée recommandée sur {zone}.",
         "Prévoir un effectif de réserve mobilisable sous 30 minutes.",
     ],
-    2: [  # TENDU (56-75)
+    2: [  # TENDU (55-71)
         "Renforcer le dispositif périmètre {zone} dès {hour}h.",
         "Prévoir rotation effectifs sur le créneau {from_h}h-{to_h}h.",
         "Coordonner avec TCL pour information flux transport.",
     ],
-    3: [  # CRITIQUE (76-100)
+    3: [  # CRITIQUE (72-100)
         "Dispositif renforcé obligatoire. Activation protocole événement majeur.",
         "Présence terrain recommandée dès T-3h ({hour}h).",
         "Alerter le donneur d'ordres — conditions hors référentiel normal.",
@@ -285,9 +285,9 @@ _RECO_TEMPLATES = {
 def _recommendation_level(score: int) -> int:
     if score < 35:
         return 0
-    if score < 56:
+    if score < 55:
         return 1
-    if score < 76:
+    if score < 72:
         return 2
     return 3
 
@@ -451,11 +451,11 @@ async def pre_event_report(
     critical_zones = []
     peak_window_score = 0
     peak_window = {"from": 8, "to": 20}
-    for zid in sorted(all_event_zones):
+    for zid in sorted(focus_zones):
         zdata = sim["zones"].get(zid)
         if not zdata:
             continue
-        if zdata["peak_score"] >= 55:
+        if zdata["peak_score"] >= 72:
             critical_zones.append(zid)
         for rw in zdata.get("risk_windows", []):
             if rw["peak_score"] > peak_window_score:
@@ -463,7 +463,7 @@ async def pre_event_report(
                 peak_window = {"from": rw["from"], "to": rw["to"]}
 
     overall_max = max(
-        (sim["zones"][z]["peak_score"] for z in all_event_zones if z in sim["zones"]),
+        (zones_analysis[z]["peak_score"] for z in focus_zones if z in zones_analysis),
         default=29,
     )
     overall_risk = score_level(overall_max)
@@ -471,12 +471,21 @@ async def pre_event_report(
 
     # Horizon confidence
     days_ahead = (target_date - datetime.now(timezone.utc).date()).days
-    if days_ahead <= 2:
+    if days_ahead < 0:
+        confidence = "retrospective"
+    elif days_ahead <= 2:
         confidence = "high"
     elif days_ahead <= 7:
         confidence = "medium"
     else:
         confidence = "low"
+
+    # Compute overall dominant signal from breakdown
+    signals_breakdown = _build_signals_breakdown(zones_analysis, focus_zones)
+    _all_dom = [v.get("dominant_signal", "traffic") for v in signals_breakdown.values()]
+    _dominant_signal = max(set(_all_dom), key=_all_dom.count) if _all_dom else "traffic"
+    _SIGNAL_LABELS = {"traffic": "trafic", "weather": "météo", "transport": "transport", "event": "événement", "incident": "incident"}
+    _dominant_label = _SIGNAL_LABELS.get(_dominant_signal, _dominant_signal)
 
     # ── BLUF narrative ──────────────────────────────────────────────────
     critical_zone_names = [ZONE_NAMES.get(z, z) for z in critical_zones]
@@ -485,7 +494,7 @@ async def pre_event_report(
             f"{ev['name']} du {target_date.strftime('%d/%m')} présente un risque {overall_risk} "
             f"(pic estimé {overall_max}) concentré sur "
             f"{', '.join(critical_zone_names[:3])} entre {peak_window['from']}h et {peak_window['to']}h. "
-            f"Signal dominant : trafic. Renforcement dispositif recommandé dès {max(peak_window['from'] - 3, 6)}h."
+            f"Signal dominant : {_dominant_label}. Renforcement dispositif recommandé dès {max(peak_window['from'] - 3, 6)}h."
         )
     elif overall_max >= 55:
         bluf = (
@@ -531,7 +540,10 @@ async def pre_event_report(
     }
     dps = _DPS_MAP[rec_level]
     n_zones_tendu = sum(1 for z in focus_zones if zones_analysis.get(z, {}).get("peak_score", 0) >= 55)
-    staffing_estimate = f"{n_zones_tendu * 4}-{n_zones_tendu * 6} agents" if n_zones_tendu > 0 else "Effectif standard"
+    _weight_mult = 2.0 if ev["weight"] >= 1.5 else 1.5 if ev["weight"] >= 1.0 else 1.0
+    _staff_low = max(int(n_zones_tendu * 4 * _weight_mult), 2)
+    _staff_high = max(int(n_zones_tendu * 6 * _weight_mult), 4)
+    staffing_estimate = f"{_staff_low}-{_staff_high} agents" if n_zones_tendu > 0 else "Effectif standard"
 
     # Build report
     return {
@@ -563,7 +575,7 @@ async def pre_event_report(
             "zones_tendu": n_zones_tendu,
         },
         "weather_context": sim["weather_context"],
-        "signals_breakdown": _build_signals_breakdown(zones_analysis, focus_zones),
+        "signals_breakdown": signals_breakdown,
         "data_confidence": confidence,
         "next_update": f"Rapport actualisé disponible à J-1 ({(target_date - timedelta(days=1)).isoformat()}).",
     }
