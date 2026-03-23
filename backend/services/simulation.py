@@ -204,19 +204,26 @@ def _detect_risk_windows(
 ) -> List[Dict]:
     """
     Group consecutive hours where score >= threshold into risk windows.
-    Each window has from/to hours, max level, and dominant signal.
+    Split when the level changes (e.g. TENDU→CRITIQUE) so that a 14h block
+    becomes distinct sub-windows by intensity phase.
     """
     windows: List[Dict] = []
     current_window = None
 
     for entry in hourly:
         if entry["score"] >= threshold:
+            # Split on level change (TENDU→CRITIQUE or vice-versa)
+            if current_window is not None and entry["level"] != current_window["current_level"]:
+                windows.append(_finalize_window(current_window))
+                current_window = None
+
             if current_window is None:
                 current_window = {
                     "from": entry["hour"],
                     "to": entry["hour"],
                     "peak_score": entry["score"],
                     "peak_level": entry["level"],
+                    "current_level": entry["level"],
                     "signals_acc": {s: [] for s in ("traffic", "weather", "transport", "event", "incident")},
                 }
             current_window["to"] = entry["hour"]
