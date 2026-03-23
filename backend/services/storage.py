@@ -887,7 +887,12 @@ def get_hourly_signal_profiles(
     cols_avg = ", ".join(f"AVG(raw_{s}) AS avg_{s}" for s in signals)
     cols_count = "COUNT(raw_traffic) AS n"
 
-    where_clauses = ["zone_id = ?", "raw_traffic IS NOT NULL"]
+    where_clauses = [
+        "zone_id = ?",
+        "raw_traffic IS NOT NULL",
+        "source = 'live'",
+        f"ts >= '{CALIBRATION_CUTOFF_TS}'",
+    ]
     params: list = [zone_id]
 
     # Filtrage par day_type via le jour de semaine SQLite

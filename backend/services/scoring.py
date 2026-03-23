@@ -607,6 +607,13 @@ def _forecast_extended_horizon(
     for sig in ("traffic", "weather", "event", "transport", "incident"):
         struct_signals[sig] = profile_at_h.get(sig, bl[sig]["mu"])
 
+    # Injecter les événements calendrier connus (donnée déterministe)
+    from services.events import compute_event_signals
+    future_event_signals = compute_event_signals(future_dt.date())
+    ev_val = future_event_signals.get(zone_id, 0.0)
+    if ev_val > 0:
+        struct_signals["event"] = max(struct_signals["event"], ev_val)
+
     # Météo prévue remplace la moyenne historique (seul signal fiable à 6h+)
     if weather_forecast:
         future_local = future_dt.astimezone(LYON_TZ)

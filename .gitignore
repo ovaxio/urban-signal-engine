@@ -18,6 +18,7 @@ frontend/out/
 
 # Claude Code
 settings.local.json
+solocraft
 
 # OS
 .DS_Store
