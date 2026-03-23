@@ -19,7 +19,7 @@ Tu es le gardien du modèle de scoring Urban Signal Engine. Tu as une connaissan
 - CALIBRATION_CUTOFF_TS = "2026-03-15T00:00:00" (ADR-001)
 
 ## Composition transport (ADR-001)
-- `parcrelais × 0.30 + passages_tcl × 0.55 + velov × 0.15`
+- `parcrelais × 0.30 + passages_tcl × 0.50 + velov × 0.20`
 - passages_tcl est INVERSÉ : `1.0 - min(count / seuil, 1.0)`
 
 ## Ton rôle

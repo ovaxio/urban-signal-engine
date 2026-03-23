@@ -12,7 +12,9 @@
       "Bash(sqlite3 /Users/ovaxio/CascadeProjects/urban-signal-engine/backend/data/urban_signal.db \"SELECT source, COUNT\\(*\\) FROM signals_history WHERE ts >= ''2026-03-15T00:00:00'' AND source=''live'' GROUP BY source;\")",
       "Bash(sqlite3 /Users/ovaxio/CascadeProjects/urban-signal-engine/backend/data/urban_signal.db \":*)",
       "WebFetch(domain:urban-signal-engine.onrender.com)",
-      "Bash(wc -l /Users/ovaxio/CascadeProjects/urban-signal-engine/.claude/projects/-Users-ovaxio-CascadeProjects-urban-signal-engine/memory/*)"
+      "Bash(wc -l /Users/ovaxio/CascadeProjects/urban-signal-engine/.claude/projects/-Users-ovaxio-CascadeProjects-urban-signal-engine/memory/*)",
+      "Bash(wc -l /Users/ovaxio/CascadeProjects/urban-signal-engine/CLAUDE.md /Users/ovaxio/CascadeProjects/urban-signal-engine/context/*.md)",
+      "Bash(git reset:*)"
     ]
   }
 }

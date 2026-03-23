@@ -19,3 +19,4 @@ Read relevant ADR before modifying any component listed in Triggers.
 | [013](ADR-013-incident-decay-extended-forecast.md) | Incident decay for extended forecast horizons | Accepted | 2026-03-23 | scoring.py _forecast_extended_horizon, config.py INCIDENT_FORECAST_HALFLIFE_MIN |
 | [014](ADR-014-incident-surprise-thresholds.md) | Harden incident_surprise detection thresholds | Accepted | 2026-03-23 | forecast_storage.py evaluate_forecasts, flag_incident_surprises |
 | [015](ADR-015-calibration-snapshot-fallback.md) | Calibration snapshot fallback | Accepted | 2026-03-23 | main.py _apply_calibration, storage.py calibration, refresh_seed.sh, Render deploy |
+| [016](ADR-016-modular-context-architecture.md) | Modular context architecture | Accepted | 2026-03-23 | CLAUDE.md structure, context/ modules, SoloCraft agent instructions |
