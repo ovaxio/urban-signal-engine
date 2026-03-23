@@ -15,3 +15,6 @@ Read relevant ADR before modifying any component listed in Triggers.
 | [009](ADR-009-time-slot-baselines.md) | Time-slot baselines | Accepted | 2026-03-23 | storage.py calibration, scoring.py _effective_baseline, main.py _apply_calibration |
 | [010](ADR-010-neutral-when-low-all-signals.md) | Clamp z négatifs traffic/transport dans RISK | Accepted | 2026-03-23 | scoring.py compute_risk, _NEUTRAL_WHEN_LOW, RISK formula |
 | [011](ADR-011-simulation-phi-removal-and-report-fixes.md) | Remove double-phi in simulation + align report thresholds | Accepted | 2026-03-23 | simulation.py, reports.py pre_event_report, _recommendation_level, DPS staffing |
+| [012](ADR-012-forecast-weighted-average.md) | Forecast short-horizon: weighted average replaces max | Accepted | 2026-03-23 | scoring.py _forecast_short_horizon, forecast bias, scenario weights |
+| [013](ADR-013-incident-decay-extended-forecast.md) | Incident decay for extended forecast horizons | Accepted | 2026-03-23 | scoring.py _forecast_extended_horizon, config.py INCIDENT_FORECAST_HALFLIFE_MIN |
+| [014](ADR-014-incident-surprise-thresholds.md) | Harden incident_surprise detection thresholds | Accepted | 2026-03-23 | forecast_storage.py evaluate_forecasts, flag_incident_surprises |

@@ -60,6 +60,7 @@ SPATIAL_KERNEL_DECAY: float = 0.6
 # Horizons courts (temps réel) + étendus (structurels)
 FORECAST_HORIZONS: List[int] = [30, 60, 120]
 FORECAST_HORIZONS_EXTENDED: List[int] = [360, 720, 1440]  # 6h, 12h, 24h
+INCIDENT_FORECAST_HALFLIFE_MIN: int = 240  # 4h — decay incidents dans forecast étendu (ADR-013)
 # Criter : 2 appels/refresh (trafic + incidents), sans quota → TTL 60s
 CACHE_TTL_SECONDS: int = 60
 ENABLE_HISTORY: bool = os.getenv("ENABLE_HISTORY", "true").lower() == "true"

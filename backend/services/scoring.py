@@ -69,6 +69,7 @@ LYON_TZ = ZoneInfo("Europe/Paris")
 from config import (
     EPSILON, WEIGHTS, LAMBDA, THETA, ALPHA, BETA,
     SPATIAL_KERNEL_DECAY, FORECAST_HORIZONS, FORECAST_HORIZONS_EXTENDED,
+    INCIDENT_FORECAST_HALFLIFE_MIN,
 )
 from services.calendar_utils import day_type as _day_type, load_vacances_from_db
 
@@ -541,8 +542,14 @@ def _forecast_short_horizon(
                 compute_conv(proj_signals, bl),
             )
 
-        # MAX des 3 scénarios
-        fa = max(fa_persist, fa_maintained, fa_proj)
+        # Moyenne pondérée des scénarios (ADR-012)
+        if fa_proj > 0.0:
+            fa_avg = 0.25 * fa_persist + 0.55 * fa_maintained + 0.20 * fa_proj
+        else:
+            fa_avg = 0.30 * fa_persist + 0.70 * fa_maintained
+        # Plancher sécuritaire : jamais plus de 30% sous le max
+        fa_max = max(fa_persist, fa_maintained, fa_proj)
+        fa = max(fa_avg, fa_max * 0.70)
 
         # Tendance récente
         trend_decay   = math.exp(-h / 60)
@@ -625,11 +632,15 @@ def _forecast_extended_horizon(
         if wf_score is not None:
             struct_signals["weather"] = wf_score
 
-    # Incidents persistants (travaux avec endtime > t+h)
+    # Incidents persistants — décroissance exponentielle (ADR-013)
+    # Les incidents se résolvent souvent avant leur endtime déclaré.
+    # On blend : historique (rush inclus) + fraction décroissante de l'excès.
     if incident_schedule and h in incident_schedule:
         inc_val = incident_schedule[h]
         if inc_val > 0:
-            struct_signals["incident"] = max(struct_signals["incident"], inc_val)
+            inc_decay = 0.5 ** (h / INCIDENT_FORECAST_HALFLIFE_MIN)
+            hist_inc = struct_signals["incident"]
+            struct_signals["incident"] = hist_inc + inc_decay * max(inc_val - hist_inc, 0)
 
     # L'anomaly est modulée par phi : un incident à 1h du matin
     # a moins d'impact qu'à 8h (personne n'est impacté la nuit).

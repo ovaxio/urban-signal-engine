@@ -102,7 +102,7 @@ def evaluate_forecasts(
     Compare les forecasts passés avec les scores actuels.
     Pour chaque forecast dont target_ts est dans [now - tolerance, now + tolerance]
     et qui n'a pas encore été évalué, on enregistre le score réel et le delta.
-    Si |delta| > 10 et raw_incident > 0 à l'instant évalué → incident_surprise = 1.
+    Si |delta| > 15 et raw_incident > 0.5 à l'instant évalué → incident_surprise = 1 (ADR-014).
     """
     now = datetime.now(timezone.utc)
     window_start = (now - timedelta(minutes=tolerance_minutes)).isoformat(timespec="seconds")
@@ -134,11 +134,11 @@ def evaluate_forecasts(
             if actual is None:
                 continue
             delta = actual - row["predicted_score"]
-            # Inline incident_surprise detection
+            # Inline incident_surprise detection (ADR-014)
             surprise = 0
-            if abs(delta) > 10:
+            if abs(delta) > 15:
                 raw_inc = get_raw_incident_at(row["zone_id"], eval_ts, db_path=db_path)
-                if raw_inc > 0:
+                if raw_inc > 0.5:
                     surprise = 1
             conn.execute(sql_update, (actual, delta, eval_ts, surprise, row["id"]))
             evaluated += 1
@@ -157,7 +157,7 @@ def flag_incident_surprises(
     """
     Backfill : marque les forecasts évalués comme 'incident_surprise'
     en vérifiant raw_incident dans signals_history au moment de l'évaluation.
-    Critères : |delta| > 10 AND raw_incident > 0 à evaluated_at ±5min.
+    Critères : |delta| > 15 AND raw_incident > 0.5 à evaluated_at ±5min (ADR-014).
     Le paramètre incident_events est conservé pour compatibilité mais ignoré
     (la détection inline dans evaluate_forecasts() couvre les nouveaux cas).
     """
@@ -166,7 +166,7 @@ def flag_incident_surprises(
         FROM forecast_history
         WHERE actual_score IS NOT NULL
           AND incident_surprise = 0
-          AND ABS(delta) > 10
+          AND ABS(delta) > 15
           AND evaluated_at IS NOT NULL
     """
     sql_update = "UPDATE forecast_history SET incident_surprise = 1 WHERE id = ?"
@@ -178,7 +178,7 @@ def flag_incident_surprises(
 
     for row in rows:
         raw_inc = get_raw_incident_at(row["zone_id"], row["evaluated_at"], db_path=db_path)
-        if raw_inc > 0:
+        if raw_inc > 0.5:
             with _get_conn(db_path) as conn:
                 conn.execute(sql_update, (row["id"],))
             flagged += 1
@@ -193,12 +193,14 @@ def flag_incident_surprises(
 def get_forecast_accuracy(
     zone_id: Optional[str] = None,
     horizon: Optional[str] = None,
+    since: Optional[str] = None,
     limit: int = 200,
     db_path: Path = DB_PATH,
 ) -> Dict[str, Any]:
     """
     Stats de précision des forecasts évalués :
     MAE global et par horizon, taux d'incident_surprise, dernières évaluations.
+    since: ISO date string (YYYY-MM-DD or full ISO) — filtre evaluated_at >= since.
     """
     where_clauses = ["actual_score IS NOT NULL"]
     params: list = []
@@ -208,6 +210,9 @@ def get_forecast_accuracy(
     if horizon:
         where_clauses.append("horizon = ?")
         params.append(horizon)
+    if since:
+        where_clauses.append("evaluated_at >= ?")
+        params.append(since)
 
     where = " AND ".join(where_clauses)
 

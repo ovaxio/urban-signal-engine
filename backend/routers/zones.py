@@ -188,13 +188,15 @@ async def force_refresh(background_tasks: BackgroundTasks):
 async def forecast_accuracy(
     zone_id: Optional[str] = Query(None),
     horizon: Optional[str] = Query(None),
+    since: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
 ):
     """
     Stats de précision des forecasts : MAE global et par horizon,
     taux d'incidents surprises, dernières évaluations.
+    since: filtre evaluated_at >= date (ISO format).
     """
-    return get_forecast_accuracy(zone_id=zone_id, horizon=horizon, limit=limit)
+    return get_forecast_accuracy(zone_id=zone_id, horizon=horizon, since=since, limit=limit)
 
 
 def _parse_sim_date(date: str) -> date_type:

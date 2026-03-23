@@ -31,8 +31,8 @@ function maeColor(mae: number | null): string {
 
 function biasLabel(bias: number | null): string {
   if (bias === null) return "-";
-  if (bias > 2)  return `+${bias} (sur-estime)`;
-  if (bias < -2) return `${bias} (sous-estime)`;
+  if (bias > 2)  return `+${bias} (sous-estime)`;
+  if (bias < -2) return `${bias} (sur-estime)`;
   return `${bias > 0 ? "+" : ""}${bias} (neutre)`;
 }
 
@@ -42,6 +42,7 @@ export default function ForecastAccuracyPage() {
   const [error, setError]     = useState<string | null>(null);
   const [zoneFilter, setZoneFilter] = useState("");
   const [horizonFilter, setHorizonFilter] = useState("");
+  const [periodFilter, setPeriodFilter] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,14 +51,24 @@ export default function ForecastAccuracyPage() {
       const params: Record<string, string | number> = { limit: 100 };
       if (zoneFilter)    params.zone_id = zoneFilter;
       if (horizonFilter) params.horizon = horizonFilter;
-      const res = await fetchForecastAccuracy(params as { zone_id?: string; horizon?: string; limit?: number });
+      if (periodFilter) {
+        const now = new Date();
+        if (periodFilter === "24h") {
+          params.since = new Date(now.getTime() - 24 * 3600_000).toISOString();
+        } else if (periodFilter === "7j") {
+          params.since = new Date(now.getTime() - 7 * 86400_000).toISOString();
+        } else if (periodFilter === "v2") {
+          params.since = "2026-03-23T16:00:00";
+        }
+      }
+      const res = await fetchForecastAccuracy(params as { zone_id?: string; horizon?: string; since?: string; limit?: number });
       setData(res);
     } catch {
       setError("Impossible de charger les stats de forecast.");
     } finally {
       setLoading(false);
     }
-  }, [zoneFilter, horizonFilter]);
+  }, [zoneFilter, horizonFilter, periodFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -99,6 +110,16 @@ export default function ForecastAccuracyPage() {
             >
               <option value="">Tous les horizons</option>
               {HORIZONS.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+            <select
+              value={periodFilter}
+              onChange={e => setPeriodFilter(e.target.value)}
+              className="rounded-md border border-border bg-bg-inner px-2.5 py-1.5 text-[11px] text-text-primary"
+            >
+              <option value="">Toute la periode</option>
+              <option value="24h">Dernieres 24h</option>
+              <option value="7j">7 derniers jours</option>
+              <option value="v2">Depuis modele V2</option>
             </select>
           </div>
 
@@ -204,7 +225,7 @@ export default function ForecastAccuracyPage() {
                 <span><span className="text-[#f97316]">MAE 5-10</span> = acceptable</span>
                 <span><span className="text-[#ef4444]">MAE &gt; 10</span> = a ameliorer</span>
                 <span>MAE clean = hors incidents surprises</span>
-                <span>Biais &gt; 0 = sur-estimation</span>
+                <span>Biais &gt; 0 = sous-estimation</span>
               </div>
             </>
           )}

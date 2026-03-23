@@ -234,6 +234,9 @@ Decisions are in `docs/decisions/`. Read the relevant ADR before modifying any c
 | 009 | Time-slot baselines | storage.py calibration, scoring.py _effective_baseline, main.py _apply_calibration |
 | 010 | Clamp z négatifs traffic/transport dans RISK | scoring.py compute_risk, _NEUTRAL_WHEN_LOW, RISK formula |
 | 011 | Remove double-phi in simulation + align report thresholds | simulation.py, reports.py pre_event_report, _recommendation_level, DPS staffing |
+| 012 | Forecast short-horizon: weighted average replaces max | scoring.py _forecast_short_horizon, forecast bias, scenario weights |
+| 013 | Incident decay for extended forecast horizons | scoring.py _forecast_extended_horizon, config.py INCIDENT_FORECAST_HALFLIFE_MIN |
+| 014 | Harden incident_surprise detection thresholds | forecast_storage.py evaluate_forecasts, flag_incident_surprises |
 
 ## Target market (context for naming/comments)
 Primary: sécurité privée / événementielle Lyon (rapport événement 390€ HT one-shot → abonnement 490€/mois)
