@@ -172,10 +172,10 @@ class TestComputeRisk:
         r_rush  = compute_risk(SIGNALS_RUSH, phi_rush)
         assert r_rush > r_night
 
-    def test_calm_signals_give_negative_risk(self):
-        """Signaux bas → z < 0 → risk < 0 (ville calme)."""
+    def test_calm_signals_give_zero_risk(self):
+        """Signaux bas → z < 0 → clampé à 0 → risk == 0 (ADR-010: _NEUTRAL_WHEN_LOW)."""
         phi = compute_phi(DT_NOON)
-        assert compute_risk(SIGNALS_CALM, phi) < 0
+        assert compute_risk(SIGNALS_CALM, phi) == 0.0
 
 
 # ─── compute_conv ──────────────────────────────────────────────────────────────

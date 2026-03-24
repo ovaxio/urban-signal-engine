@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-03-24T09:25:16+00:00",
+  "generated_at": "2026-03-24T09:27:11+00:00",
   "baseline": {
     "traffic": {
-      "mu": 1.2482,
-      "sigma": 0.2612
+      "mu": 1.2481,
+      "sigma": 0.2611
     },
     "weather": {
       "mu": 0.0117,
@@ -15,7 +15,7 @@
     },
     "incident": {
       "mu": 0.9629,
-      "sigma": 0.3476
+      "sigma": 0.3475
     }
   },
   "zone_baselines": {
@@ -33,14 +33,14 @@
         "sigma": 0.2
       },
       "incident": {
-        "mu": 0.5853,
-        "sigma": 0.2594
+        "mu": 0.5855,
+        "sigma": 0.2595
       }
     },
     "confluence": {
       "traffic": {
-        "mu": 1.1411,
-        "sigma": 0.1837
+        "mu": 1.141,
+        "sigma": 0.1836
       },
       "weather": {
         "mu": 0.0117,
@@ -51,13 +51,13 @@
         "sigma": 0.2
       },
       "incident": {
-        "mu": 1.1857,
-        "sigma": 0.3191
+        "mu": 1.1855,
+        "sigma": 0.319
       }
     },
     "croix-rousse": {
       "traffic": {
-        "mu": 1.1218,
+        "mu": 1.122,
         "sigma": 0.15
       },
       "weather": {
@@ -65,18 +65,18 @@
         "sigma": 0.1
       },
       "transport": {
-        "mu": 0.5581,
+        "mu": 0.5582,
         "sigma": 0.2
       },
       "incident": {
-        "mu": 1.1034,
-        "sigma": 0.3598
+        "mu": 1.1036,
+        "sigma": 0.3597
       }
     },
     "fourviere": {
       "traffic": {
         "mu": 1.1954,
-        "sigma": 0.1974
+        "sigma": 0.1973
       },
       "weather": {
         "mu": 0.0117,
@@ -87,13 +87,13 @@
         "sigma": 0.2
       },
       "incident": {
-        "mu": 0.8449,
-        "sigma": 0.311
+        "mu": 0.8448,
+        "sigma": 0.3109
       }
     },
     "gerland": {
       "traffic": {
-        "mu": 1.2345,
+        "mu": 1.2344,
         "sigma": 0.2686
       },
       "weather": {
@@ -101,17 +101,17 @@
         "sigma": 0.1
       },
       "transport": {
-        "mu": 0.341,
+        "mu": 0.3409,
         "sigma": 0.2
       },
       "incident": {
         "mu": 0.996,
-        "sigma": 0.3329
+        "sigma": 0.3327
       }
     },
     "guillotiere": {
       "traffic": {
-        "mu": 1.2769,
+        "mu": 1.2767,
         "sigma": 0.1887
       },
       "weather": {
@@ -123,13 +123,13 @@
         "sigma": 0.2
       },
       "incident": {
-        "mu": 1.0644,
-        "sigma": 0.2972
+        "mu": 1.0642,
+        "sigma": 0.2971
       }
     },
     "montchat": {
       "traffic": {
-        "mu": 1.1581,
+        "mu": 1.158,
         "sigma": 0.15
       },
       "weather": {
@@ -137,17 +137,17 @@
         "sigma": 0.1
       },
       "transport": {
-        "mu": 0.5621,
+        "mu": 0.5623,
         "sigma": 0.2
       },
       "incident": {
-        "mu": 0.9416,
-        "sigma": 0.3107
+        "mu": 0.9415,
+        "sigma": 0.3106
       }
     },
     "part-dieu": {
       "traffic": {
-        "mu": 1.1961,
+        "mu": 1.196,
         "sigma": 0.15
       },
       "weather": {
@@ -160,31 +160,31 @@
       },
       "incident": {
         "mu": 0.8935,
-        "sigma": 0.2715
+        "sigma": 0.2714
       }
     },
     "perrache": {
       "traffic": {
-        "mu": 1.3715,
-        "sigma": 0.3215
+        "mu": 1.3713,
+        "sigma": 0.3214
       },
       "weather": {
         "mu": 0.0117,
         "sigma": 0.1
       },
       "transport": {
-        "mu": 0.309,
+        "mu": 0.3089,
         "sigma": 0.2
       },
       "incident": {
-        "mu": 1.1168,
-        "sigma": 0.3291
+        "mu": 1.1164,
+        "sigma": 0.3293
       }
     },
     "presquile": {
       "traffic": {
         "mu": 1.5438,
-        "sigma": 0.362
+        "sigma": 0.3618
       },
       "weather": {
         "mu": 0.0117,
@@ -195,14 +195,14 @@
         "sigma": 0.2
       },
       "incident": {
-        "mu": 1.0115,
-        "sigma": 0.2868
+        "mu": 1.0116,
+        "sigma": 0.2867
       }
     },
     "vieux-lyon": {
       "traffic": {
-        "mu": 1.4508,
-        "sigma": 0.3287
+        "mu": 1.4509,
+        "sigma": 0.3286
       },
       "weather": {
         "mu": 0.0117,
@@ -214,7 +214,7 @@
       },
       "incident": {
         "mu": 0.7634,
-        "sigma": 0.266
+        "sigma": 0.2659
       }
     },
     "villette": {
@@ -231,8 +231,8 @@
         "sigma": 0.2
       },
       "incident": {
-        "mu": 1.0483,
-        "sigma": 0.3291
+        "mu": 1.0482,
+        "sigma": 0.3289
       }
     }
   },
@@ -257,20 +257,20 @@
     },
     "matin": {
       "traffic": {
-        "mu": 1.2478,
-        "sigma": 0.2259
+        "mu": 1.2476,
+        "sigma": 0.2258
       },
       "weather": {
         "mu": 0.0239,
-        "sigma": 0.1262
+        "sigma": 0.126
       },
       "transport": {
-        "mu": 0.3305,
+        "mu": 0.3306,
         "sigma": 0.2
       },
       "incident": {
-        "mu": 1.0383,
-        "sigma": 0.2688
+        "mu": 1.038,
+        "sigma": 0.2686
       }
     },
     "nuit": {
@@ -332,20 +332,20 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.1471,
+          "mu": 1.1472,
           "sigma": 0.15
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
-          "mu": 0.3096,
+          "mu": 0.3097,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 0.6859,
-          "sigma": 0.2215
+          "mu": 0.6864,
+          "sigma": 0.2216
         }
       },
       "nuit": {
@@ -406,20 +406,20 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.1462,
-          "sigma": 0.1587
+          "mu": 1.146,
+          "sigma": 0.1586
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
-          "mu": 0.1961,
+          "mu": 0.196,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 1.1475,
-          "sigma": 0.2662
+          "mu": 1.147,
+          "sigma": 0.2661
         }
       },
       "nuit": {
@@ -480,20 +480,20 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.1437,
-          "sigma": 0.1653
+          "mu": 1.1443,
+          "sigma": 0.1655
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
-          "mu": 0.5784,
+          "mu": 0.5787,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 1.1524,
-          "sigma": 0.3173
+          "mu": 1.1529,
+          "sigma": 0.3171
         }
       },
       "nuit": {
@@ -554,19 +554,19 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.2376,
-          "sigma": 0.2289
+          "mu": 1.2374,
+          "sigma": 0.2287
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
           "mu": 0.2813,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 0.9556,
+          "mu": 0.955,
           "sigma": 0.2452
         }
       },
@@ -628,20 +628,20 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.2252,
-          "sigma": 0.2258
+          "mu": 1.2249,
+          "sigma": 0.2256
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
           "mu": 0.2921,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 1.0825,
-          "sigma": 0.2268
+          "mu": 1.0823,
+          "sigma": 0.2266
         }
       },
       "nuit": {
@@ -702,19 +702,19 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.2684,
-          "sigma": 0.1573
+          "mu": 1.2679,
+          "sigma": 0.1574
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
-          "mu": 0.2863,
+          "mu": 0.2865,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 1.1499,
+          "mu": 1.1493,
           "sigma": 0.15
         }
       },
@@ -776,19 +776,19 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.1561,
+          "mu": 1.1559,
           "sigma": 0.15
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
-          "mu": 0.5965,
+          "mu": 0.5969,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 1.0478,
+          "mu": 1.0473,
           "sigma": 0.1983
         }
       },
@@ -850,20 +850,20 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.1903,
+          "mu": 1.19,
           "sigma": 0.15
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
-          "mu": 0.2507,
+          "mu": 0.2506,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 0.9476,
-          "sigma": 0.1552
+          "mu": 0.9474,
+          "sigma": 0.1551
         }
       },
       "nuit": {
@@ -924,20 +924,20 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.3957,
-          "sigma": 0.3462
+          "mu": 1.3952,
+          "sigma": 0.3459
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
           "mu": 0.273,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 1.1168,
-          "sigma": 0.3632
+          "mu": 1.1156,
+          "sigma": 0.3636
         }
       },
       "nuit": {
@@ -999,19 +999,19 @@
       "matin": {
         "traffic": {
           "mu": 1.5062,
-          "sigma": 0.2274
+          "sigma": 0.2272
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
-          "mu": 0.2623,
+          "mu": 0.2622,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 1.0874,
-          "sigma": 0.1559
+          "mu": 1.0873,
+          "sigma": 0.1557
         }
       },
       "nuit": {
@@ -1072,20 +1072,20 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.3994,
-          "sigma": 0.2104
+          "mu": 1.3998,
+          "sigma": 0.2103
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
-          "mu": 0.2865,
+          "mu": 0.2864,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 0.9119,
-          "sigma": 0.1831
+          "mu": 0.9116,
+          "sigma": 0.183
         }
       },
       "nuit": {
@@ -1146,20 +1146,20 @@
       },
       "matin": {
         "traffic": {
-          "mu": 1.1571,
+          "mu": 1.157,
           "sigma": 0.15
         },
         "weather": {
           "mu": 0.0239,
-          "sigma": 0.1262
+          "sigma": 0.126
         },
         "transport": {
-          "mu": 0.353,
+          "mu": 0.3532,
           "sigma": 0.2
         },
         "incident": {
-          "mu": 1.1743,
-          "sigma": 0.201
+          "mu": 1.174,
+          "sigma": 0.2009
         }
       },
       "nuit": {
