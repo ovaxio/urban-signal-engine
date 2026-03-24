@@ -124,15 +124,451 @@ STATIC_EVENTS: List[dict] = [
         "hours":  (11, 23),         # food festival midi → soirée
         "ramp":   1,
     },
-    # --- Q3 ---
+    # ── Nuits de Fourvière 2026 — 80e édition (28 mai – 25 juillet) ──────
+    # Entrées par concert/spectacle — remplace l'ancienne entrée "saison" unique.
+    # Grand Théâtre (~4500 pl.) + Odéon (~1100 pl.) : coords (45.7622, 4.8200)
+    # Poids = notoriété × jauge × imprévisibilité foule :
+    #   S=1.8 (headliner intl sold-out)  A=1.5 (headliner majeur/sécu-sensible)
+    #   A-=1.3 (star nationale forte)    B=1.0 (bon headliner)
+    #   C+=0.8 (samedis festifs/électro) C=0.7 (thématiques/world)
+    #   D=0.5 (niche/danse/cirque)
+    # Sources : nuitsdefourviere.com, infoconcert.com, sortiraparis.com, grandlyon.com
+    #
+    # --- Ouverture ---
     {
-        "name":   "Nuits de Fourvière (saison)",
-        "dates":  _days("2026-05-28", "2026-07-25"),
+        "name":   "NdF — Circa « Revoir les étoiles » (ouverture)",
+        "dates":  _days("2026-05-28", "2026-05-30"),
         "zone":   "fourviere",
         "lat":    45.7622, "lng": 4.8200,
-        "weight": 0.5,    # impact quotidien modéré, boost les soirs de gros concerts
-        "hours":  (20, 23),         # spectacles en soirée
+        "weight": 0.5,
+        "hours":  (20, 22),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Radio Live (Musée des Confluences)",
+        "dates":  _days("2026-05-30", "2026-05-31"),
+        "zone":   "confluence",
+        "lat":    45.7329, "lng": 4.8183,
+        "weight": 0.5,
+        "hours":  (18, 22),
+        "ramp":   1,
+    },
+    # --- Juin — Grand Théâtre ---
+    {
+        "name":   "NdF — MC Solaar & Youssoupha",
+        "dates":  [date(2026, 6, 2)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.0,            # hip-hop français, création unique
+        "hours":  (21, 23),
         "ramp":   2,
+    },
+    {
+        "name":   "NdF — Bertrand Belin / Yaël Naïm",
+        "dates":  [date(2026, 6, 3)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # chanson française, public modéré
+        "hours":  (21, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Little Simz",
+        "dates":  [date(2026, 6, 4)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.5,            # UK rapper, Mercury Prize, 4500 pl.
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Gaël Faye + Pat Kalla",
+        "dates":  [date(2026, 6, 5)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.0,            # rap/world, Goncourt des lycéens
+        "hours":  (21, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Samedi Hexagone (Odezenne, Yelle, Melba)",
+        "dates":  [date(2026, 6, 6)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.8,            # samedi multi-artistes, format festif
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Les Dames du raï (Odéon)",
+        "dates":  [date(2026, 6, 7)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.5,            # Odéon ~1100 pl., world/raï
+        "hours":  (20, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Vanessa Paradis",
+        "dates":  _days("2026-06-08", "2026-06-09"),
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.3,            # star nationale, 2 soirs, 66 EUR
+        "hours":  (21, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Massive Attack",
+        "dates":  _days("2026-06-10", "2026-06-11"),
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.8,            # S-tier : headliner intl, sold-out, 85 EUR, 2 soirs
+        "hours":  (21, 23),
+        "ramp":   3,              # fans arrivent dès 18h30
+    },
+    {
+        "name":   "NdF — Cesaria Evora Orchestra",
+        "dates":  [date(2026, 6, 12)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # hommage, world music
+        "hours":  (21, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Samedi Bal Masqué (Barbara Butch)",
+        "dates":  [date(2026, 6, 13)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # format bal, foule imprévisible mais petit prix
+        "hours":  (21, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Gravity & Other Myths (cirque)",
+        "dates":  _days("2026-06-14", "2026-06-16"),
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.5,
+        "hours":  (20, 22),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Résurrection (Mahler / Opéra de Lyon)",
+        "dates":  [date(2026, 6, 17)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.5,            # classique, public discipliné
+        "hours":  (21, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Jack White",
+        "dates":  [date(2026, 6, 18)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.5,            # A-tier : ex-White Stripes, rock, 68 EUR
+        "hours":  (21, 23),
+        "ramp":   3,
+    },
+    {
+        "name":   "NdF — Sébastien Tellier + Giorgio Poi",
+        "dates":  [date(2026, 6, 19)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.8,            # électro/pop français
+        "hours":  (21, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Samedi Hip-Hop (Yame, Ino Casablanca)",
+        "dates":  [date(2026, 6, 20)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.8,            # samedi festif, public jeune
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Sharon Eyal + Ballet Opéra de Lyon",
+        "dates":  _days("2026-06-23", "2026-06-24"),
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.5,            # danse contemporaine
+        "hours":  (21, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Selah Sue",
+        "dates":  [date(2026, 6, 25)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.0,            # soul/pop belge, 52 EUR
+        "hours":  (21, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Eddy de Pretto × Maud Le Pladec",
+        "dates":  [date(2026, 6, 26)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.8,            # pop/rap + danse, création
+        "hours":  (22, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Samedi Soul (Curtis Harding, José James)",
+        "dates":  [date(2026, 6, 27)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # samedi thématique soul/blues
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — 1, 2, 3 Poquelin (tg STAN)",
+        "dates":  _days("2026-06-28", "2026-06-29"),
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.5,            # théâtre
+        "hours":  (20, 22),
+        "ramp":   1,
+    },
+    # --- Juillet — Grand Théâtre ---
+    {
+        "name":   "NdF — Ballet Preljocaj « Le Lac des cygnes »",
+        "dates":  _days("2026-07-01", "2026-07-03"),
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.8,            # ballet renommé, Grand Théâtre plein air
+        "hours":  (22, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Samedi 100% Lyon (Trinix, Plum, Dowdelin)",
+        "dates":  [date(2026, 7, 4)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # samedi local
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Nuit de la Poésie (Clara Ysé)",
+        "dates":  [date(2026, 7, 5)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.5,            # niche, public littéraire
+        "hours":  (21, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Zip Zap Circus « Moya »",
+        "dates":  [date(2026, 7, 6)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.5,
+        "hours":  (20, 22),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Camille Symphonique + ONL",
+        "dates":  [date(2026, 7, 7)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.3,            # A- : Camille + Orchestre National de Lyon, 62 EUR
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Pulp",
+        "dates":  [date(2026, 7, 8)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.8,            # S-tier : reformation britpop, intl, 68 EUR
+        "hours":  (21, 23),
+        "ramp":   3,
+    },
+    {
+        "name":   "NdF — Agnès Obel + Quatuor Debussy",
+        "dates":  [date(2026, 7, 9)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.0,            # indie/classical, 59 EUR
+        "hours":  (21, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Darkside (Nicolas Jaar) + SUUNS",
+        "dates":  [date(2026, 7, 10)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.8,            # electronic/experimental
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Samedi Cubain (Los Van Van, Eliades Ochoa)",
+        "dates":  [date(2026, 7, 11)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # samedi world/salsa
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Wet Leg + Lambrini Girls",
+        "dates":  [date(2026, 7, 13)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.0,            # UK indie buzz, 45 EUR
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Lorde",
+        "dates":  [date(2026, 7, 15)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.8,            # S-tier : global pop star, public jeune, 69 EUR
+        "hours":  (21, 23),
+        "ramp":   3,
+    },
+    {
+        "name":   "NdF — Asaf Avidan + Mina Tindle",
+        "dates":  [date(2026, 7, 16)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.0,            # folk/rock, fanbase fidèle, 68 EUR
+        "hours":  (21, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Charlotte Cardin",
+        "dates":  [date(2026, 7, 17)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.3,            # A- : rising star canadienne, 68 EUR
+        "hours":  (21, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Samedi Electro (Polo & Pan, Roller Disco)",
+        "dates":  [date(2026, 7, 18)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.0,            # Polo & Pan headliner + format fête
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — The Köln Concert (Enhco, Namekawa)",
+        "dates":  [date(2026, 7, 19)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.5,            # jazz/classique, public connaisseur
+        "hours":  (21, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Patrick Watson + Gildaa",
+        "dates":  [date(2026, 7, 20)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.0,            # indie canadien, 45 EUR
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Vincent Delerm / Vincent Dedienne",
+        "dates":  [date(2026, 7, 21)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # chanson/humour, public familial
+        "hours":  (21, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Kery James / Isha × Limsa d'Aulnay",
+        "dates":  [date(2026, 7, 22)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 1.5,            # A-tier : hip-hop engagé, crowd sensible sécu
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — The Divine Comedy",
+        "dates":  [date(2026, 7, 23)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # chamber pop
+        "hours":  (21, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Clair Obscur : Expedition 33",
+        "dates":  [date(2026, 7, 24)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # concert jeu vidéo, format immersif
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "NdF — Nuit du Raï (clôture)",
+        "dates":  [date(2026, 7, 25)],
+        "zone":   "fourviere",
+        "lat":    45.7622, "lng": 4.8200,
+        "weight": 0.7,            # samedi de clôture, raï/world
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    # --- NdF hors-les-murs (dans rayon 1.2 km d'une zone) ---
+    {
+        "name":   "NdF — Ce que le ciel ne sait pas (Les Subs)",
+        "dates":  _days("2026-06-04", "2026-06-06"),
+        "zone":   "presquile",
+        "lat":    45.7695, "lng": 4.8265,  # Les Subs, quai Saint-Vincent
+        "weight": 0.5,
+        "hours":  (20, 22),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Boris Charmatz CERCLES (Halle Tony Garnier)",
+        "dates":  _days("2026-07-03", "2026-07-04"),
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,  # Halle Tony Garnier
+        "weight": 0.7,
+        "hours":  (20, 22),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Orchestre vide (Les Subs)",
+        "dates":  _days("2026-07-08", "2026-07-09"),
+        "zone":   "presquile",
+        "lat":    45.7695, "lng": 4.8265,
+        "weight": 0.3,
+        "hours":  (20, 22),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — SHANGWE le bal (Les Subs)",
+        "dates":  [date(2026, 7, 14)],
+        "zone":   "presquile",
+        "lat":    45.7695, "lng": 4.8265,
+        "weight": 0.5,            # format bal festif
+        "hours":  (20, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "NdF — Rebecca Chaillon (Les Subs)",
+        "dates":  _days("2026-07-16", "2026-07-19"),
+        "zone":   "presquile",
+        "lat":    45.7695, "lng": 4.8265,
+        "weight": 0.3,
+        "hours":  (20, 22),
+        "ramp":   1,
     },
     {
         "name":   "Biennale d'Art Contemporain",
