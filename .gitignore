@@ -30,3 +30,4 @@ Thumbs.db
 
 frontend/tsconfig.tsbuildinfo
 .claude/skills/sc*
+.claude/settings.json

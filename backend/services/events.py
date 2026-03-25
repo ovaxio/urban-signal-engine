@@ -570,6 +570,226 @@ STATIC_EVENTS: List[dict] = [
         "hours":  (20, 22),
         "ramp":   1,
     },
+    # ── Halle Tony Garnier 2026 (17 000 pl.) ─────────────────────────────
+    # Zone gerland — coords (45.7299, 4.8250)
+    # Source : halle-tony-garnier.com/fr/programmation
+    {
+        "name":   "HTG — Lara Fabian",
+        "dates":  [date(2026, 3, 24)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.2,            # pop, forte notoriété
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — Thylacine",
+        "dates":  [date(2026, 3, 26)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 0.8,            # électro, public niche
+        "hours":  (20, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "HTG — Jean-Baptiste Guégan",
+        "dates":  [date(2026, 3, 28)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.0,            # tribute Johnny, public familial
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — Black Legends",
+        "dates":  [date(2026, 4, 1)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 0.8,
+        "hours":  (20, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "HTG — Reperkusound (festival électro)",
+        "dates":  [date(2026, 4, 4)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 2.0,            # S-tier : festival, crowd massive, nuit
+        "hours":  (18, 23),
+        "ramp":   3,
+    },
+    {
+        "name":   "HTG — Dorothée",
+        "dates":  [date(2026, 4, 10)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.2,            # nostalgie, sold-out probable
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — Amel Bent (Minuit Une Tour)",
+        "dates":  [date(2026, 4, 16)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.5,            # A-tier : star pop FR, tournée
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — Ultra Vomit + Metal Immersion",
+        "dates":  [date(2026, 4, 18)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.5,            # A-tier : metal, crowd intense et imprévisible
+        "hours":  (19, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — 15000 voix pour les légendes du rock",
+        "dates":  [date(2026, 4, 26)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 2.0,            # S-tier : événement massif, jauge max
+        "hours":  (20, 23),
+        "ramp":   3,
+    },
+    {
+        "name":   "HTG — Nuit Encore × Sara Landry",
+        "dates":  [date(2026, 4, 30)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.5,            # électro nuit, crowd festive
+        "hours":  (22, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — World of Warcraft",
+        "dates":  [date(2026, 5, 9)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 0.8,            # gaming event, public calme
+        "hours":  (14, 22),
+        "ramp":   1,
+    },
+    {
+        "name":   "HTG — Lorie",
+        "dates":  [date(2026, 5, 30)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.0,            # pop FR, public familial
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — La Légende de Monte-Cristo (musical)",
+        "dates":  [date(2026, 6, 3)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 0.8,
+        "hours":  (20, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "HTG — Architect at Work (salon pro)",
+        "dates":  _days("2026-06-10", "2026-06-11"),
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 0.5,            # salon professionnel, faible impact
+        "hours":  (9, 18),
+        "ramp":   1,
+    },
+    {
+        "name":   "HTG — Outworld",
+        "dates":  [date(2026, 6, 19)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 0.8,
+        "hours":  (20, 23),
+        "ramp":   1,
+    },
+    # Jul 3-4 NdF Cercles → déjà dans les entrées NdF hors-les-murs ci-dessus
+    {
+        "name":   "HTG — M Pokora",
+        "dates":  [date(2026, 9, 11)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 2.0,            # S-tier : star pop FR, sold-out garanti, 17k
+        "hours":  (20, 23),
+        "ramp":   3,
+    },
+    {
+        "name":   "HTG — The World of Queen",
+        "dates":  [date(2026, 10, 1)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.0,            # ciné-concert, public large
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — Djadja & Dinaz",
+        "dates":  _days("2026-11-05", "2026-11-06"),
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.5,            # A-tier : rap FR majeur, 2 soirs, crowd jeune
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — Josman",
+        "dates":  [date(2026, 11, 7)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.2,            # rap FR, bonne notoriété
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — The World of Hans Zimmer",
+        "dates":  [date(2026, 11, 10)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.2,            # ciné-concert premium, public dense
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — Malik Bentalha",
+        "dates":  [date(2026, 11, 11)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 0.8,            # humour, public modéré
+        "hours":  (20, 23),
+        "ramp":   1,
+    },
+    {
+        "name":   "HTG — L'Héritage Goldman 2",
+        "dates":  [date(2026, 11, 19)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.2,            # tribute, forte affluence
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — Disiz",
+        "dates":  [date(2026, 12, 4)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 1.2,            # rap FR, bonne notoriété
+        "hours":  (20, 23),
+        "ramp":   2,
+    },
+    {
+        "name":   "HTG — Disney en concert",
+        "dates":  [date(2026, 12, 18)],
+        "zone":   "gerland",
+        "lat":    45.7299, "lng": 4.8250,
+        "weight": 0.8,            # famille, public calme
+        "hours":  (17, 20),
+        "ramp":   1,
+    },
     {
         "name":   "Biennale d'Art Contemporain",
         "dates":  _days("2026-09-19", "2026-12-31"),  # Sep 19 → ~Jan 3 2027

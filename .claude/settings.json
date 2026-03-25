@@ -14,7 +14,28 @@
       "WebFetch(domain:urban-signal-engine.onrender.com)",
       "Bash(wc -l /Users/ovaxio/CascadeProjects/urban-signal-engine/.claude/projects/-Users-ovaxio-CascadeProjects-urban-signal-engine/memory/*)",
       "Bash(wc -l /Users/ovaxio/CascadeProjects/urban-signal-engine/CLAUDE.md /Users/ovaxio/CascadeProjects/urban-signal-engine/context/*.md)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "WebFetch(domain:www.nuitsdefourviere.com)",
+      "WebFetch(domain:www.sortiraparis.com)",
+      "WebFetch(domain:mesinfos.fr)",
+      "WebFetch(domain:www.lyoncapitale.fr)",
+      "WebFetch(domain:tribunedelyon.fr)",
+      "WebFetch(domain:www.infoconcert.com)",
+      "WebFetch(domain:www.grandlyon.com)",
+      "WebFetch(domain:www.jds.fr)",
+      "WebFetch(domain:www.festivalenfrance.com)",
+      "WebFetch(domain:www.visiterlyon.com)",
+      "WebFetch(domain:sceneweb.fr)",
+      "WebFetch(domain:www.francebleu.fr)",
+      "WebFetch(domain:lyon.citycrunch.fr)",
+      "WebFetch(domain:bastringue.fr)",
+      "WebFetch(domain:www.euronews.com)",
+      "WebFetch(domain:www.latins-de-jazz.com)",
+      "WebFetch(domain:www.baz-art.org)",
+      "WebFetch(domain:fr.wikipedia.org)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:www.lyon.fr)",
+      "Bash(/dev/null done:*)"
     ]
   }
 }
