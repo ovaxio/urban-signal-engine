@@ -24,14 +24,16 @@ log = logging.getLogger("ingestion")
 # Helper HTTP
 # ---------------------------------------------------------------------------
 
+_HEADERS = {"User-Agent": "UrbanSignalEngine/1.0 (https://urban-signal-engine.onrender.com)"}
+
 async def safe_get(client: httpx.AsyncClient, url: str, params: dict = None) -> Optional[dict]:
     for attempt in range(2):
         try:
-            r = await client.get(url, params=params, timeout=10.0)
+            r = await client.get(url, params=params, timeout=12.0, headers=_HEADERS)
             r.raise_for_status()
             return r.json()
         except Exception as e:
-            log.warning(f"API call failed [{url}] (attempt {attempt + 1}/2): {e}")
+            log.warning(f"API call failed [{url}] (attempt {attempt + 1}/2): {type(e).__name__}: {e}")
     return None
 
 # Correction cosinus à la latitude de Lyon (~45.76°) pour que
@@ -78,17 +80,28 @@ def _weather_score_from_values(precip: float, wind: float, wmo: int) -> float:
     return min(score, WEATHER_SCORE_MAX)
 
 
+_weather_last_known: dict = {"score": None, "ts": None}
+_WEATHER_STALE_MAX = 7200  # 2h — au-delà, on préfère 0.0 à une valeur trop vieille
+
 async def fetch_weather() -> Dict[str, float]:
     async with httpx.AsyncClient() as client:
         data = await safe_get(client, APIS.WEATHER_URL)
     if not data:
-        log.error("[weather] Open-Meteo inaccessible — fallback neutre 0.0 (pas de signal météo)")
+        cached = _weather_last_known["score"]
+        if cached is not None:
+            age = (datetime.datetime.now(datetime.timezone.utc) - _weather_last_known["ts"]).total_seconds()
+            if age < _WEATHER_STALE_MAX:
+                log.warning("[weather] Open-Meteo inaccessible — last known score=%.3f (age=%.0fs)", cached, age)
+                return {z: cached for z in ZONE_CENTROIDS}
+        log.error("[weather] Open-Meteo inaccessible — fallback neutre 0.0")
         return {z: 0.0 for z in ZONE_CENTROIDS}
     cur    = data.get("current", {})
     precip = float(cur.get("precipitation", 0))
     wind   = float(cur.get("wind_speed_10m", 0))
     wmo    = int(cur.get("weather_code", 0))
     score  = _weather_score_from_values(precip, wind, wmo)
+    _weather_last_known["score"] = round(score, 3)
+    _weather_last_known["ts"]    = datetime.datetime.now(datetime.timezone.utc)
     return {z: round(score, 3) for z in ZONE_CENTROIDS}
 
 # ---------------------------------------------------------------------------
