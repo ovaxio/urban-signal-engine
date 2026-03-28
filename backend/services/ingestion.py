@@ -25,13 +25,14 @@ log = logging.getLogger("ingestion")
 # ---------------------------------------------------------------------------
 
 async def safe_get(client: httpx.AsyncClient, url: str, params: dict = None) -> Optional[dict]:
-    try:
-        r = await client.get(url, params=params, timeout=8.0)
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        log.warning(f"API call failed [{url}]: {e}")
-        return None
+    for attempt in range(2):
+        try:
+            r = await client.get(url, params=params, timeout=10.0)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            log.warning(f"API call failed [{url}] (attempt {attempt + 1}/2): {e}")
+    return None
 
 # Correction cosinus à la latitude de Lyon (~45.76°) pour que
 # 1° de longitude pèse autant que 1° de latitude en distance réelle.
@@ -81,7 +82,8 @@ async def fetch_weather() -> Dict[str, float]:
     async with httpx.AsyncClient() as client:
         data = await safe_get(client, APIS.WEATHER_URL)
     if not data:
-        return {z: 0.5 for z in ZONE_CENTROIDS}
+        log.error("[weather] Open-Meteo inaccessible — fallback neutre 0.0 (pas de signal météo)")
+        return {z: 0.0 for z in ZONE_CENTROIDS}
     cur    = data.get("current", {})
     precip = float(cur.get("precipitation", 0))
     wind   = float(cur.get("wind_speed_10m", 0))
