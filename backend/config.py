@@ -70,9 +70,37 @@ ENABLE_HISTORY: bool = os.getenv("ENABLE_HISTORY", "true").lower() == "true"
 # données brutes Open-Meteo en score météo synthétique [0, 3.0].
 WEATHER_PRECIP_DIVISOR: float = 5.0    # mm → score : score += min(precip / divisor, 1.5)
 WEATHER_WIND_THRESHOLD: float = 50.0   # km/h — au-delà → +0.5
-WEATHER_WMO_SEVERE: int = 95           # code WMO ≥ 95 (orage violent) → +1.5
-WEATHER_WMO_MODERATE: int = 61         # code WMO ≥ 61 (pluie modérée) → +0.8
 WEATHER_SCORE_MAX: float = 3.0         # borne haute du score météo
+
+# Lookup granulaire WMO → contribution score (ADR-017)
+# Capte la perturbation opérationnelle (mobilité/trafic), pas le risque criminologique.
+# Codes source : https://open-meteo.com/en/docs/weather_code
+WEATHER_WMO_SCORE: Dict[int, float] = {
+    0: 0.0,   # Clear sky
+    1: 0.0,   # Mainly clear
+    2: 0.0,   # Partly cloudy
+    3: 0.0,   # Overcast
+    45: 0.4,  # Fog
+    48: 0.4,  # Depositing rime fog
+    51: 0.2,  # Drizzle light
+    53: 0.2,  # Drizzle moderate
+    55: 0.2,  # Drizzle dense
+    61: 0.3,  # Rain slight
+    63: 0.5,  # Rain moderate
+    65: 0.8,  # Rain heavy
+    71: 0.7,  # Snow fall slight
+    73: 0.7,  # Snow fall moderate
+    75: 0.7,  # Snow fall heavy
+    77: 0.7,  # Snow grains
+    80: 0.2,  # Rain showers slight
+    81: 0.5,  # Rain showers moderate
+    82: 1.0,  # Rain showers violent
+    85: 0.7,  # Snow showers slight
+    86: 0.7,  # Snow showers heavy
+    95: 1.5,  # Thunderstorm slight/moderate
+    96: 1.5,  # Thunderstorm with slight hail
+    99: 1.5,  # Thunderstorm with heavy hail
+}
 
 # Mapping état Criter → ratio synthétique de congestion
 # V=fluide, O=dense, R=chargé, N=coupée, G/*/inconnu=ignoré

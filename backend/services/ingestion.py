@@ -11,7 +11,7 @@ import httpx
 from config import (
     APIS, ENABLE_HISTORY, CRITER_ETAT_TO_RATIO, ZONE_CENTROIDS,
     WEATHER_PRECIP_DIVISOR, WEATHER_WIND_THRESHOLD,
-    WEATHER_WMO_SEVERE, WEATHER_WMO_MODERATE, WEATHER_SCORE_MAX,
+    WEATHER_WMO_SCORE, WEATHER_SCORE_MAX,
 )
 from services.events import fetch_event_signals
 from services.smoothing import smooth_signals
@@ -56,12 +56,24 @@ def _nearest_zone(lat: float, lon: float) -> Optional[str]:
 # Météo — Open-Meteo
 # ---------------------------------------------------------------------------
 
+def _wmo_contribution(wmo: int) -> float:
+    """Lookup granulaire WMO → contribution score (ADR-017).
+    Utilise une correspondance exacte ; retourne 0.0 pour les codes non listés."""
+    return WEATHER_WMO_SCORE.get(wmo, 0.0)
+
+
 def _weather_score_from_values(precip: float, wind: float, wmo: int) -> float:
-    """Score météo synthétique [0, WEATHER_SCORE_MAX] depuis les valeurs Open-Meteo."""
+    """Score météo synthétique [0, WEATHER_SCORE_MAX] depuis les valeurs Open-Meteo.
+
+    Composition :
+    - précipitations : min(precip / WEATHER_PRECIP_DIVISOR, 1.5)
+    - vent fort      : +0.5 si wind > WEATHER_WIND_THRESHOLD
+    - code WMO       : lookup granulaire via WEATHER_WMO_SCORE (ADR-017)
+    """
     score = 0.0
     score += min(precip / WEATHER_PRECIP_DIVISOR, 1.5)
     score += 0.5 if wind > WEATHER_WIND_THRESHOLD else 0.0
-    score += 1.5 if wmo >= WEATHER_WMO_SEVERE else (0.8 if wmo >= WEATHER_WMO_MODERATE else 0.0)
+    score += _wmo_contribution(wmo)
     return min(score, WEATHER_SCORE_MAX)
 
 

@@ -66,6 +66,7 @@ Decisions in `docs/decisions/`. Read relevant ADR before modifying any Triggers 
 | 014 | Incident_surprise thresholds | forecast_storage.py evaluate_forecasts, flag_incident_surprises |
 | 015 | Calibration snapshot fallback | main.py _apply_calibration, storage.py calibration, refresh_seed.sh |
 | 016 | Modular context architecture | CLAUDE.md, context/, .claude/agents/, SoloCraft context-modules |
+| 017 | WMO granular weather score scale | config.py WEATHER_WMO_SCORE, ingestion.py _weather_score_from_values, _wmo_contribution |
 
 ## Known issues — do not re-investigate without new data
 - Deploy jump in history chart: seed is fresh (pre-commit, ~2-3min delta)
