@@ -1233,12 +1233,20 @@ def export_calibration_snapshot(
     slot_bl = get_calibration_baselines_by_slot(min_count=min_count // 4, db_path=db_path)
     zone_slot_bl = get_calibration_baselines_per_zone_by_slot(min_count=min_count // 8, db_path=db_path)
 
+    # Forecast auto-learning params (ADR-018)
+    try:
+        from services.forecast_learning import get_forecast_params as _get_fp
+        forecast_params = _get_fp()
+    except Exception:
+        forecast_params = {}
+
     snapshot = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "baseline": baselines,
         "zone_baselines": zone_bl,
         "baseline_by_slot": slot_bl,
         "zone_baselines_by_slot": zone_slot_bl,
+        "forecast_params": forecast_params,
     }
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

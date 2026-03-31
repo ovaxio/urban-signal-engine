@@ -107,6 +107,20 @@ async def force_recalibrate(authorization: Optional[str] = Header(default=None))
     }
 
 
+@router.get("/forecast-learning")
+async def forecast_learning_preview(authorization: Optional[str] = Header(default=None)):
+    """
+    Aperçu de l'auto-apprentissage forecast : paramètres courants, ajustements proposés,
+    stats d'accuracy par horizon (ADR-018).
+    """
+    _check_admin(authorization)
+    from services.forecast_learning import preview_learning, get_forecast_params
+    from services.forecast_storage import get_forecast_accuracy
+    accuracy = get_forecast_accuracy()
+    preview = preview_learning(accuracy)
+    return preview
+
+
 @router.get("/calibration")
 async def get_calibration(authorization: Optional[str] = Header(default=None)):
     """

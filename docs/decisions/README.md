@@ -21,3 +21,4 @@ Read relevant ADR before modifying any component listed in Triggers.
 | [015](ADR-015-calibration-snapshot-fallback.md) | Calibration snapshot fallback | Accepted | 2026-03-23 | main.py _apply_calibration, storage.py calibration, refresh_seed.sh, Render deploy |
 | [016](ADR-016-modular-context-architecture.md) | Modular context architecture | Accepted | 2026-03-23 | CLAUDE.md structure, context/ modules, SoloCraft agent instructions |
 | [017](ADR-017-wmo-granular-weather-score.md) | WMO granular weather score scale | Accepted | 2026-03-28 | config.py WEATHER_WMO_SCORE, ingestion.py _wmo_contribution, _weather_score_from_values |
+| [018](ADR-018-forecast-auto-learning.md) | Forecast auto-learning (scenario weights, decay half-lives) | Accepted | 2026-03-31 | forecast_learning.py, scoring.py _forecast_short/extended_horizon, config.py FORECAST_LEARN_*, main.py calibration_loop |

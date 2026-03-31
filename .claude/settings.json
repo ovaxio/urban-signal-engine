@@ -35,7 +35,10 @@
       "WebFetch(domain:fr.wikipedia.org)",
       "WebFetch(domain:en.wikipedia.org)",
       "WebFetch(domain:www.lyon.fr)",
-      "Bash(/dev/null done:*)"
+      "Bash(/dev/null done:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr:*)",
+      "Bash(git remote:*)"
     ]
   }
 }

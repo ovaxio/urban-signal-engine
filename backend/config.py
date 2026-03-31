@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List
+from typing import Any, Dict, List
 
 EPSILON: float = 0.001
 
@@ -101,6 +101,23 @@ WEATHER_WMO_SCORE: Dict[int, float] = {
     96: 1.5,  # Thunderstorm with slight hail
     99: 1.5,  # Thunderstorm with heavy hail
 }
+
+# ── Auto-apprentissage forecast (ADR-018) ─────────────────────────────────────
+FORECAST_LEARN_DEFAULTS: Dict[str, Any] = {
+    "scenario_weights": {"persist": 0.25, "maintained": 0.55, "proj": 0.20},
+    "scenario_weights_no_proj": {"persist": 0.30, "maintained": 0.70},
+    "decay_halflife_min": 240,
+    "incident_halflife_min": 240,
+}
+FORECAST_LEARN_BOUNDS: Dict[str, tuple] = {
+    "weight_min": 0.10,
+    "weight_max": 0.80,
+    "halflife_min": 120,
+    "halflife_max": 480,
+}
+FORECAST_LEARN_MIN_N: int = 100       # min evaluations per horizon before learning
+FORECAST_LEARN_ALPHA: float = 0.15    # EMA smoothing factor (~6 weeks memory)
+FORECAST_LEARN_MAX_STEP: float = 0.05 # max weight change per cycle
 
 # Mapping état Criter → ratio synthétique de congestion
 # V=fluide, O=dense, R=chargé, N=coupée, G/*/inconnu=ignoré

@@ -88,6 +88,18 @@ async def _calibration_loop():
         _apply_calibration(min_count=500)
         purge_old_request_logs(days=7)
 
+        # Forecast auto-learning (ADR-018)
+        try:
+            from services.forecast_learning import set_forecast_params, compute_forecast_adjustments
+            from services.forecast_storage import get_forecast_accuracy
+            accuracy = get_forecast_accuracy()
+            proposed = compute_forecast_adjustments(accuracy)
+            if proposed:
+                set_forecast_params(proposed)
+                log.info("[calibration] Forecast params updated: %s", proposed)
+        except Exception as e:
+            log.warning("[calibration] Forecast learning failed: %s", e)
+
         # Attendre 7 jours avant le prochain cycle
         await asyncio.sleep(INTERVAL_DAYS * 24 * 3600)
 
@@ -134,6 +146,16 @@ def _apply_calibration(min_count: int = 96) -> None:
             scoring.set_slot_baselines(slot_bl, zone_slot_bl)
             log.info("Snapshot slots: %d slots globaux, %d zones avec slots.",
                      len(slot_bl), len(zone_slot_bl))
+
+            # Forecast auto-learning params (ADR-018)
+            fp = snapshot.get("forecast_params")
+            if fp:
+                try:
+                    from services.forecast_learning import set_forecast_params
+                    set_forecast_params(fp)
+                    log.info("[calibration] Forecast params loaded from snapshot.")
+                except Exception as e:
+                    log.warning("[calibration] Could not load forecast params from snapshot: %s", e)
 
             _calibration_meta["last_calibrated_at"] = snapshot["generated_at"]
             _calibration_meta["row_count"] = n_rows

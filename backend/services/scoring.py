@@ -72,6 +72,7 @@ from config import (
     INCIDENT_FORECAST_HALFLIFE_MIN,
 )
 from services.calendar_utils import day_type as _day_type, load_vacances_from_db
+from services.forecast_learning import get_forecast_params
 
 import logging as _logging
 _log = _logging.getLogger("scoring")
@@ -497,7 +498,8 @@ def _forecast_short_horizon(
     """
     future_dt  = dt + timedelta(minutes=h)
     phi_future = compute_phi(future_dt)
-    decay      = math.exp(-h / 240)
+    fp         = get_forecast_params()
+    decay      = math.exp(-h / fp["decay_halflife_min"])
     phi_ratio  = min(phi_future / phi_now, 1.8)
 
     if signals:
@@ -542,11 +544,17 @@ def _forecast_short_horizon(
                 compute_conv(proj_signals, bl),
             )
 
-        # Moyenne pondérée des scénarios (ADR-012)
+        # Moyenne pondérée des scénarios (ADR-012) — weights from forecast_learning
+        sw = fp["scenario_weights"]
+        sw_np = fp["scenario_weights_no_proj"]
         if fa_proj > 0.0:
-            fa_avg = 0.25 * fa_persist + 0.55 * fa_maintained + 0.20 * fa_proj
+            fa_avg = (
+                sw.get("persist", 0.25) * fa_persist
+                + sw.get("maintained", 0.55) * fa_maintained
+                + sw.get("proj", 0.20) * fa_proj
+            )
         else:
-            fa_avg = 0.30 * fa_persist + 0.70 * fa_maintained
+            fa_avg = sw_np.get("persist", 0.30) * fa_persist + sw_np.get("maintained", 0.70) * fa_maintained
         # Plancher sécuritaire : jamais plus de 30% sous le max
         fa_max = max(fa_persist, fa_maintained, fa_proj)
         fa = max(fa_avg, fa_max * 0.70)
@@ -638,7 +646,8 @@ def _forecast_extended_horizon(
     if incident_schedule and h in incident_schedule:
         inc_val = incident_schedule[h]
         if inc_val > 0:
-            inc_decay = 0.5 ** (h / INCIDENT_FORECAST_HALFLIFE_MIN)
+            _inc_halflife = get_forecast_params()["incident_halflife_min"]
+            inc_decay = 0.5 ** (h / _inc_halflife)
             hist_inc = struct_signals["incident"]
             struct_signals["incident"] = hist_inc + inc_decay * max(inc_val - hist_inc, 0)
 
