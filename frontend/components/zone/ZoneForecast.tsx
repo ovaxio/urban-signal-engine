@@ -16,7 +16,7 @@ function ForecastScore({ value }: { value: number }) {
 export default function ZoneForecast({ forecast }: Props) {
   return (
     <div className="rounded-xl border border-border bg-bg-card p-5">
-      <div className="mb-3.5 text-[10px] font-semibold tracking-widest text-text-muted">PRÉVISION</div>
+      <div className="mb-3.5 text-[10px] font-semibold tracking-widest text-text-muted">PRÉVISION D'ÉVOLUTION</div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(80px,1fr))] gap-2.5">
         <div className="rounded-lg bg-bg-inner p-3.5 text-center" style={{ border: `1px solid ${scoreColor(forecast.current_score)}44` }}>
           <div className="mb-1.5 text-[10px] text-text-muted">Maintenant</div>

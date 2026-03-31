@@ -109,7 +109,7 @@ export default function Home() {
 
   // ── Render ────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-screen flex-col font-mono">
+    <div className="flex min-h-screen flex-col">
 
       <DashboardHeader
         simMode={simMode} simDate={simDate} simLoading={simLoading}
@@ -146,8 +146,8 @@ export default function Home() {
               )}
 
               <div className="mb-4 flex flex-wrap gap-3">
-                <StatCard label="zones analysées" value={zones.length} />
-                <StatCard label="en alerte (≥55)" value={alertCount} color={alertCount > 0 ? "#f97316" : "#22c55e"} />
+                <StatCard label="zones surveillées" value={zones.length} />
+                <StatCard label="zones sous tension" value={alertCount} color={alertCount > 0 ? "#f97316" : "#22c55e"} />
                 <StatCard label="score moyen" value={avgScore} color={scoreColor(avgScore)} />
                 {topZone && <StatCard label="zone la plus tendue" value={`${topZone.zone_name} · ${topZone.urban_score}`} color={scoreColor(topZone.urban_score)} />}
               </div>
@@ -175,7 +175,7 @@ export default function Home() {
 
       <footer className="flex flex-wrap gap-1 border-t border-bg-control bg-bg-inner px-6 py-2 text-[10px] text-text-muted" style={{ justifyContent: "space-between" }}>
         <span>Urban Signal Engine · données ouvertes · Lyon</span>
-        <span>UrbanScore = Φ·(wT·T + wM·M + wE·E + wP·P) + λ₂·A + λ₃·C + λ₄·S</span>
+        <span>Score calculé en temps réel à partir de 5 sources de données urbaines</span>
       </footer>
     </div>
   );

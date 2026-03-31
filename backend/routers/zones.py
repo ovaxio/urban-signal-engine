@@ -46,9 +46,6 @@ async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
     if zone_id not in zone_map:
         raise HTTPException(status_code=404, detail=f"Zone '{zone_id}' introuvable.")
     z        = zone_map[zone_id]
-    conv_val = z["components"]["conv"]
-    conv_txt = f"{conv_val:.2f} (signaux multiples)" if conv_val > 0.3 else f"{conv_val:.2f} (faible)"
-    explanation = f"Zone {z['level'].lower()} (score {z['urban_score']}/100). Signaux forts : {', '.join(z['top_causes'])}. Convergence : {conv_txt}. Diffusion voisinage : {z['components']['spread']:.2f}."
     neighbors = [
         {"zone_id": n, "zone_name": zone_map[n]["zone_name"], "urban_score": zone_map[n]["urban_score"],
          "level": zone_map[n]["level"], "top_causes": zone_map[n]["top_causes"]}
@@ -69,9 +66,10 @@ async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
         for r in rss_incidents if r.zone_id == zone_id
     ]
     # ── Contexte décisionnel (delta vs typical + recommandation) ────────────
-    now = datetime.now(timezone.utc)
-    dt = get_day_type(now)
-    hour = now.hour
+    from zoneinfo import ZoneInfo
+    now_paris = datetime.now(ZoneInfo("Europe/Paris"))
+    dt = get_day_type(now_paris)
+    hour = now_paris.hour
     typical = get_typical_score(zone_id, dt, hour)
     delta = round(z["urban_score"] - typical, 1) if typical is not None else None
 
@@ -92,7 +90,6 @@ async def get_zone_detail(zone_id: str, force_refresh: bool = Query(False)):
 
     return {
         **{k: v for k, v in z.items() if k != "alert"},
-        "explanation":      explanation,
         "neighbors":        neighbors,
         "incident_events":  incident_events.get(zone_id, []),
         "transport_detail": transport_detail.get(zone_id),
@@ -255,14 +252,6 @@ async def simulate_zone_detail(zone_id: str, date: str = Query(..., description=
         raise HTTPException(status_code=404, detail=f"Zone '{zone_id}' introuvable.")
 
     z = zone_map[zone_id]
-    conv_val = z["components"]["conv"]
-    conv_txt = f"{conv_val:.2f} (signaux multiples)" if conv_val > 0.3 else f"{conv_val:.2f} (faible)"
-    explanation = (
-        f"Zone {z['level'].lower()} (score {z['urban_score']}/100) — simulation {date}. "
-        f"Signaux forts : {', '.join(z['top_causes'])}. "
-        f"Convergence : {conv_txt}. "
-        f"Diffusion voisinage : {z['components']['spread']:.2f}."
-    )
     neighbors = [
         {
             "zone_id":     n,
@@ -275,7 +264,6 @@ async def simulate_zone_detail(zone_id: str, date: str = Query(..., description=
     ]
     return {
         **{k: v for k, v in z.items() if k != "alert"},
-        "explanation":  explanation,
         "neighbors":    neighbors,
         "sim_date":     date,
         "sim_events":   active_events,

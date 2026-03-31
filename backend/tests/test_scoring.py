@@ -247,20 +247,15 @@ class TestTopCauses:
     def test_fete_returns_event_in_causes(self):
         causes = top_causes(SIGNALS_FETE)
         assert len(causes) > 0
-        # Avec traffic=3.0 (route coupée N), trafic domine, mais event doit être présent
-        assert any("Événement" in c for c in causes)
+        # top_causes returns raw signal keys
+        assert any(c == "event" for c in causes)
 
-    def test_no_negative_sigma_in_output(self):
-        """Les causes ne doivent jamais afficher un σ négatif."""
-        for signals in [SIGNALS_CALM, SIGNALS_NEUTRAL, SIGNALS_RUSH, SIGNALS_FETE]:
-            for cause in top_causes(signals):
-                assert "-" not in cause, f"Cause négative: {cause}"
-
-    def test_format(self):
+    def test_returns_raw_keys(self):
+        """top_causes returns raw signal keys (no labels, no σ)."""
         causes = top_causes(SIGNALS_FETE)
+        valid_keys = {"traffic", "weather", "event", "transport", "incident"}
         for c in causes:
-            assert "σ" in c
-            assert "+" in c
+            assert c in valid_keys, f"Unexpected cause key: {c}"
 
 
 # ─── scénarios end-to-end ──────────────────────────────────────────────────────

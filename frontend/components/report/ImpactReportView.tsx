@@ -1,6 +1,14 @@
 import type { ImpactReport, ImpactZone, Alert } from "@/domain/types";
 import { scoreColor } from "@/domain/scoring";
 
+const SIGNAL_LABELS: Record<string, string> = {
+  traffic:   "Trafic",
+  weather:   "Météo",
+  event:     "Événement",
+  transport: "Transport TCL",
+  incident:  "Incidents",
+};
+
 function Delta({ value }: { value: number | null }) {
   if (value == null) return null;
   const sign = value > 0 ? "+" : "";
@@ -34,11 +42,11 @@ function SummaryCards({ report }: { report: ImpactReport }) {
   const s = report.summary;
   const cards = [
     { label: "SCORE MOYEN", value: s.global_avg_score, color: scoreColor(s.global_avg_score) },
-    { label: "PIC", value: s.global_peak_score, color: scoreColor(s.global_peak_score) },
-    { label: "ALERTES CRITIQUE", value: s.alerts_critique, color: "#ef4444" },
-    { label: "ALERTES TENDU", value: s.alerts_tendu, color: "#f97316" },
-    { label: "ZONES ANALYSÉES", value: s.zones_analyzed, color: "var(--text-primary)" },
-    { label: "RELEVÉS", value: s.total_data_points, color: "var(--text-primary)" },
+    { label: "PIC DE TENSION", value: s.global_peak_score, color: scoreColor(s.global_peak_score) },
+    { label: "ALERTES CRITIQUES", value: s.alerts_critique, color: "#ef4444" },
+    { label: "ALERTES TENDUES", value: s.alerts_tendu, color: "#f97316" },
+    { label: "ZONES SURVEILLÉES", value: s.zones_analyzed, color: "var(--text-primary)" },
+    { label: "MESURES COLLECTÉES", value: s.total_data_points, color: "var(--text-primary)" },
   ];
 
   return (
@@ -60,30 +68,30 @@ function BaselineComparison({ report }: { report: ImpactReport }) {
   return (
     <div className="rounded-lg border border-border bg-bg-card p-4">
       <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
-        COMPARAISON AVEC PÉRIODE DE RÉFÉRENCE
+        COMPARAISON AVEC UNE PÉRIODE SANS ÉVÉNEMENT
       </div>
       <div className="flex flex-wrap items-center gap-6">
         <div>
-          <div className="text-[10px] text-text-muted">Référence</div>
+          <div className="text-[10px] text-text-muted">Sans événement</div>
           <div className="text-lg font-bold" style={{ color: scoreColor(s.baseline_avg_score) }}>
             {s.baseline_avg_score}
           </div>
         </div>
         <div className="text-xl text-text-muted">→</div>
         <div>
-          <div className="text-[10px] text-text-muted">Événement</div>
+          <div className="text-[10px] text-text-muted">Pendant l'événement</div>
           <div className="text-lg font-bold" style={{ color: scoreColor(s.global_avg_score) }}>
             {s.global_avg_score}
           </div>
         </div>
         <div>
-          <div className="text-[10px] text-text-muted">Delta</div>
+          <div className="text-[10px] text-text-muted">Hausse</div>
           <div className="text-lg"><Delta value={s.delta_vs_baseline} /></div>
         </div>
       </div>
       {report.baseline_period && (
         <div className="mt-2 text-[10px] text-text-muted">
-          Période de référence : {report.baseline_period.start.split("T")[0]} → {report.baseline_period.end.split("T")[0]}
+          Période de comparaison (sans événement) : {report.baseline_period.start.split("T")[0]} → {report.baseline_period.end.split("T")[0]}
         </div>
       )}
     </div>
@@ -97,7 +105,7 @@ function TopZones({ report }: { report: ImpactReport }) {
   return (
     <div className="rounded-lg border border-border bg-bg-card p-4">
       <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
-        TOP ZONES IMPACTÉES
+        ZONES LES PLUS TOUCHÉES
       </div>
       <div className="flex flex-col gap-2">
         {zones.map((z, i) => (
@@ -137,11 +145,11 @@ function ZoneDetailCard({ zoneId, zone }: { zoneId: string; zone: ImpactZone }) 
           <div className="text-base font-bold" style={{ color: scoreColor(zone.avg_score) }}>{zone.avg_score}</div>
         </div>
         <div>
-          <div className="text-[9px] tracking-wide text-text-muted">PIC</div>
+          <div className="text-[9px] tracking-wide text-text-muted">MAXI</div>
           <div className="text-base font-bold" style={{ color: scoreColor(zone.peak_score) }}>{zone.peak_score}</div>
         </div>
         <div>
-          <div className="text-[9px] tracking-wide text-text-muted">DELTA</div>
+          <div className="text-[9px] tracking-wide text-text-muted">ÉCART</div>
           <div className="text-base"><Delta value={zone.delta_vs_baseline} /></div>
         </div>
       </div>
@@ -165,15 +173,19 @@ function ZoneDetailCard({ zoneId, zone }: { zoneId: string; zone: ImpactZone }) 
       )}
 
       <div className="flex flex-wrap gap-2 text-[10px] text-text-muted">
-        {Object.entries(zone.signal_averages_normalized).map(([sig, val]) => (
-          <span key={sig} className="rounded-sm bg-bg-control px-1.5 py-0.5">
-            {sig} {val > 0 ? "+" : ""}{val.toFixed(2)}σ
-          </span>
-        ))}
+        {Object.entries(zone.signal_averages_normalized).map(([sig, val]) => {
+          const abs = Math.abs(val);
+          const intensity = abs < 0.3 ? "normal" : abs < 0.8 ? "légèrement élevé" : abs < 1.5 ? "élevé" : "critique";
+          return (
+            <span key={sig} className="rounded-sm bg-bg-control px-1.5 py-0.5">
+              {SIGNAL_LABELS[sig] ?? sig} — {intensity}
+            </span>
+          );
+        })}
       </div>
 
       <div className="mt-1.5 text-[10px] text-text-faint">
-        {zone.data_points} relevés · {zone.readings_tendu} TENDU · {zone.readings_critique} CRITIQUE
+        {zone.data_points} relevés · {zone.readings_tendu} créneaux tendus · {zone.readings_critique} critiques
       </div>
     </div>
   );
@@ -186,7 +198,7 @@ function AlertsList({ alerts }: { alerts: Alert[] }) {
   return (
     <div className="rounded-lg border border-border bg-bg-card p-4">
       <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
-        ALERTES DÉCLENCHÉES ({alerts.length})
+        ALERTES ENREGISTRÉES ({alerts.length})
       </div>
       <div className="flex max-h-[200px] flex-col gap-1 overflow-y-auto">
         {alerts.map((a, i) => (
@@ -229,7 +241,7 @@ export default function ImpactReportView({ report }: { report: ImpactReport }) {
 
       <div>
         <div className="mb-2 text-[11px] tracking-wide text-text-secondary">
-          DÉTAIL PAR ZONE ({sortedZones.length})
+          ANALYSE ZONE PAR ZONE ({sortedZones.length})
         </div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
           {sortedZones.map(([id, zone]) => (
@@ -241,7 +253,7 @@ export default function ImpactReportView({ report }: { report: ImpactReport }) {
       <AlertsList alerts={report.alerts} />
 
       <div className="pt-2 text-center text-[10px] text-text-faint">
-        Rapport généré par Urban Signal Engine · Données historiques issues de {report.summary.total_data_points} relevés
+        Rapport généré par Urban Signal Engine · Basé sur {report.summary.total_data_points} mesures collectées
       </div>
     </div>
   );

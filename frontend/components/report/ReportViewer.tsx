@@ -302,7 +302,7 @@ export default function ReportViewer({ events }: Props) {
                     color: "var(--text-secondary)",
                   }}
                 >
-                  poids {ev.weight}
+                  impact {ev.weight}
                 </div>
               </button>
             ))}

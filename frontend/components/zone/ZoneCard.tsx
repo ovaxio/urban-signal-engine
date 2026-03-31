@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ZoneSummary } from "@/domain/types";
 import { scoreColor } from "@/domain/scoring";
+import { SIGNAL_LABELS } from "@/domain/constants";
 import ScoreBar from "@/components/ui/ScoreBar";
 
 type Props = {
@@ -36,7 +37,7 @@ export default function ZoneCard({ zone, simDate }: Props) {
         <div className="mt-2.5 flex flex-col gap-0.5">
           {(zone.top_causes ?? []).length > 0
             ? zone.top_causes.slice(0, 2).map((c, i) => (
-                <div key={i} className="truncate text-[9px] text-text-secondary">▸ {c}</div>
+                <div key={i} className="truncate text-[9px] text-text-secondary">▸ {SIGNAL_LABELS[c] ?? c}</div>
               ))
             : <div className="text-[9px] italic text-text-secondary">Conditions normales</div>
           }

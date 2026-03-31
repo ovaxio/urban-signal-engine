@@ -32,15 +32,15 @@ export default function ZoneTransportDetail({ detail }: Props) {
     <div className="rounded-xl border border-border bg-bg-card p-5">
       <div className="mb-3.5 flex items-center justify-between">
         <div className="text-[10px] font-semibold tracking-widest text-text-muted">
-          DÉTAIL TRANSPORT TCL
+          TRANSPORTS EN COMMUN
         </div>
         <div className="text-[10px] text-text-muted">
-          Score composite : <span className="font-semibold" style={{ color: barColor(detail.score) }}>
+          Pression globale : <span className="font-semibold" style={{ color: barColor(detail.score) }}>
             {(detail.score * 100).toFixed(0)}%
           </span>
           {detail.fallback && (
             <span className="ml-1.5 rounded-sm bg-[#f9731622] px-1.5 py-px text-[9px] text-[#f97316]">
-              fallback
+              données partielles
             </span>
           )}
         </div>

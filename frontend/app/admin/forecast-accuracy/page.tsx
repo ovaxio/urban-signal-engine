@@ -31,9 +31,9 @@ function maeColor(mae: number | null): string {
 
 function biasLabel(bias: number | null): string {
   if (bias === null) return "-";
-  if (bias > 2)  return `+${bias} (sous-estime)`;
-  if (bias < -2) return `${bias} (sur-estime)`;
-  return `${bias > 0 ? "+" : ""}${bias} (neutre)`;
+  if (bias > 2)  return `+${bias} (tend à sous-estimer)`;
+  if (bias < -2) return `${bias} (tend à surestimer)`;
+  return `${bias > 0 ? "+" : ""}${bias} (centré)`;
 }
 
 export default function ForecastAccuracyPage() {
@@ -73,12 +73,12 @@ export default function ForecastAccuracyPage() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="flex min-h-screen flex-col font-mono">
+    <div className="flex min-h-screen flex-col">
       <div className="border-b border-border bg-bg-card px-6 py-3.5">
         <div className="mx-auto flex max-w-[960px] items-center justify-between">
           <div>
-            <div className="text-sm font-bold text-text-primary">Forecast Accuracy</div>
-            <div className="mt-0.5 text-[10px] text-text-muted">Suivi de la precision des previsions par horizon</div>
+            <div className="text-sm font-bold text-text-primary">Précision des prévisions</div>
+            <div className="mt-0.5 text-[10px] text-text-muted">Suivi de la précision des prévisions par horizon temporel</div>
           </div>
           <button
             onClick={load}
@@ -116,10 +116,10 @@ export default function ForecastAccuracyPage() {
               onChange={e => setPeriodFilter(e.target.value)}
               className="rounded-md border border-border bg-bg-inner px-2.5 py-1.5 text-[11px] text-text-primary"
             >
-              <option value="">Toute la periode</option>
-              <option value="24h">Dernieres 24h</option>
+              <option value="">Toute la période</option>
+              <option value="24h">Dernières 24h</option>
               <option value="7j">7 derniers jours</option>
-              <option value="v2">Depuis modele V2</option>
+              <option value="v2">Depuis modèle V2</option>
             </select>
           </div>
 
@@ -133,28 +133,28 @@ export default function ForecastAccuracyPage() {
             </div>
           ) : data && data.total_evaluated === 0 ? (
             <div className="rounded-xl border border-border bg-bg-card p-8 text-center">
-              <div className="mb-1.5 text-[13px] text-text-secondary">Aucune evaluation disponible</div>
+              <div className="mb-1.5 text-[13px] text-text-secondary">Aucune évaluation disponible</div>
               <div className="text-[11px] text-text-muted">
-                Les forecasts sont enregistres a chaque appel et evalues quand l&apos;heure cible arrive.
-                Premiere evaluation possible : +30min apres le premier forecast enregistre.
+                Les prévisions sont enregistrées à chaque appel et comparées au score réel une fois l'heure cible atteinte.
+                Première évaluation possible : 30 min après le premier enregistrement.
               </div>
             </div>
           ) : data && (
             <>
               <div className="mb-4 flex flex-wrap gap-3">
-                <StatBox label="Evaluations" value={data.total_evaluated} />
-                <StatBox label="MAE global" value={data.mae_global !== null ? `${data.mae_global} pts` : "-"} color={maeColor(data.mae_global)} />
-                <StatBox label="Incidents surprises" value={data.incident_surprises} color={data.incident_surprises > 0 ? "#f97316" : "var(--text-secondary)"} />
+                <StatBox label="Prévisions évaluées" value={data.total_evaluated} />
+                <StatBox label="Écart moyen" value={data.mae_global !== null ? `${data.mae_global} pts` : "-"} color={maeColor(data.mae_global)} />
+                <StatBox label="Incidents imprévus" value={data.incident_surprises} color={data.incident_surprises > 0 ? "#f97316" : "var(--text-secondary)"} />
               </div>
 
               <div className="mb-4 overflow-hidden rounded-xl border border-border bg-bg-card">
                 <div className="border-b border-border px-4 py-3 text-[10px] font-semibold tracking-widest text-text-muted">
-                  PRECISION PAR HORIZON
+                  PRÉCISION PAR HORIZON
                 </div>
                 <table className="w-full border-collapse text-[11px]">
                   <thead>
                     <tr className="border-b border-border">
-                      {["Horizon", "Evaluations", "MAE", "MAE (clean)", "Biais", "Min", "Max", "Surprises"].map(h => (
+                      {["Horizon", "Évaluations", "Écart moy.", "Écart (hors incidents)", "Tendance", "Min", "Max", "Imprévus"].map(h => (
                         <th key={h} className="px-3 py-2 text-left text-[10px] font-medium text-text-muted">{h}</th>
                       ))}
                     </tr>
@@ -178,13 +178,13 @@ export default function ForecastAccuracyPage() {
 
               <div className="overflow-hidden rounded-xl border border-border bg-bg-card">
                 <div className="border-b border-border px-4 py-3 text-[10px] font-semibold tracking-widest text-text-muted">
-                  DERNIERES EVALUATIONS
+                  DERNIÈRES ÉVALUATIONS
                 </div>
                 <div className="max-h-[400px] overflow-y-auto">
                   <table className="w-full border-collapse text-[11px]">
                     <thead>
                       <tr className="sticky top-0 border-b border-border bg-bg-card">
-                        {["Zone", "Horizon", "Prevu", "Reel", "Delta", "Surprise", "Evalue a"].map(h => (
+                        {["Zone", "Horizon", "Score prévu", "Score réel", "Écart", "Incident", "Évalué à"].map(h => (
                           <th key={h} className="px-3 py-2 text-left text-[10px] font-medium text-text-muted">{h}</th>
                         ))}
                       </tr>
@@ -221,11 +221,11 @@ export default function ForecastAccuracyPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-4 text-[10px] text-text-muted">
-                <span><span className="text-[#22c55e]">MAE &le; 5</span> = excellent</span>
-                <span><span className="text-[#f97316]">MAE 5-10</span> = acceptable</span>
-                <span><span className="text-[#ef4444]">MAE &gt; 10</span> = a ameliorer</span>
-                <span>MAE clean = hors incidents surprises</span>
-                <span>Biais &gt; 0 = sous-estimation</span>
+                <span><span className="text-[#22c55e]">Écart &le; 5 pts</span> = excellent</span>
+                <span><span className="text-[#f97316]">Écart 5–10 pts</span> = acceptable</span>
+                <span><span className="text-[#ef4444]">Écart &gt; 10 pts</span> = à améliorer</span>
+                <span>Écart hors incidents = incidents surprises exclus</span>
+                <span>Tendance &gt; 0 = prévision en dessous du réel</span>
               </div>
             </>
           )}

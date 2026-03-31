@@ -463,7 +463,7 @@ def top_causes(signals: dict, n: int = 3, bl: Dict = None) -> List[str]:
     # Les valeurs négatives (trafic fluide, beau temps) ne sont pas des "causes".
     positive = [(s, v) for s, v in scored if v > 0.5]
     top = positive[:n]
-    return [f"{SIGNAL_LABELS[s]} +{v:.1f}σ" for s, v in top]
+    return [s for s, _v in top]
 
 
 def _load_hourly_profiles(zone_id: str, day_t: str) -> Dict[int, Dict[str, float]]:

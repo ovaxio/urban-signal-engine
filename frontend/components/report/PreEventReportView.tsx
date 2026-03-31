@@ -164,7 +164,7 @@ function RiskWindowsList({ windows }: { windows: RiskWindowSummary[] }) {
             <div className="mt-1 flex items-center gap-2 text-[11px] text-text-muted">
               <span>Pic {rw.peak_score}</span>
               <span>·</span>
-              <span>Signal dominant : {SIGNAL_LABELS[rw.main_signal] ?? rw.main_signal}</span>
+              <span>Cause principale : {SIGNAL_LABELS[rw.main_signal] ?? rw.main_signal}</span>
             </div>
             <div className="mt-1.5 text-[11px] text-text-secondary italic">
               {rw.recommendation}
@@ -299,7 +299,7 @@ function SignalsBreakdown({
   return (
     <div className="rounded-lg border border-border bg-bg-card p-4">
       <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
-        SIGNAUX DOMINANTS PAR ZONE
+        FACTEURS DOMINANTS PAR ZONE
       </div>
       <div className="flex flex-col gap-1.5">
         {zones.map(([zid, data]) => {
@@ -321,8 +321,11 @@ function SignalsBreakdown({
                 </span>
               </div>
               <div className="flex gap-1">
-                {zscores.map((z) => (
-                  <div key={z.signal} className="flex-1" title={`${SIGNAL_LABELS[z.signal]} ${z.value > 0 ? "+" : ""}${z.value}σ`}>
+                {zscores.map((z) => {
+                  const abs = Math.abs(z.value);
+                  const lvl = abs < 0.3 ? "normal" : abs < 0.8 ? "légèrement élevé" : abs < 1.5 ? "élevé" : abs < 2.5 ? "très élevé" : "critique";
+                  return (
+                  <div key={z.signal} className="flex-1" title={`${SIGNAL_LABELS[z.signal]} — ${lvl}`}>
                     <div className="mb-0.5 flex items-end" style={{ height: 16 }}>
                       <div
                         className="w-full rounded-t-sm"
@@ -337,7 +340,8 @@ function SignalsBreakdown({
                       {SIGNAL_LABELS[z.signal]?.slice(0, 4)}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -356,16 +360,16 @@ function EscalationTriggers({ triggers }: { triggers: { condition: string; actio
   return (
     <div className="rounded-lg border border-border bg-bg-card p-4">
       <div className="mb-2.5 text-[11px] tracking-wide text-text-secondary">
-        TRIGGERS D&apos;ESCALADE
+        SEUILS D&apos;ACTION
       </div>
       <div className="flex flex-col gap-2">
         {triggers.map((t, i) => (
           <div key={i} className="rounded-md bg-bg-inner px-3 py-2">
             <div className="text-[12px] font-semibold text-text-primary">
-              SI : {t.condition}
+              Condition : {t.condition}
             </div>
             <div className="mt-0.5 text-[11px] text-text-secondary">
-              ALORS : {t.action}
+              Action recommandée : {t.action}
             </div>
           </div>
         ))}
@@ -396,7 +400,7 @@ function DpsSection({ dps }: { dps: { categorie: string; description: string; ra
           <div className="text-[11px] text-text-secondary">{dps.ratio}</div>
         </div>
         <div>
-          <div className="text-[9px] tracking-wide text-text-muted">ZONES TENDU+</div>
+          <div className="text-[9px] tracking-wide text-text-muted">ZONES SOUS TENSION</div>
           <div className="text-sm font-bold text-text-primary">{dps.zones_tendu}</div>
         </div>
       </div>

@@ -7,9 +7,9 @@ type Props = {
 };
 
 const FILTER_OPTIONS: { key: FilterLevel; label: string; minScore?: number }[] = [
-  { key: "all",      label: "TOUTES" },
-  { key: "TENDU",    label: "TENDU+",    minScore: 55 },
-  { key: "CRITIQUE", label: "CRITIQUE",  minScore: 72 },
+  { key: "all",      label: "Toutes les zones" },
+  { key: "TENDU",    label: "Sous tension",    minScore: 55 },
+  { key: "CRITIQUE", label: "Critiques",       minScore: 72 },
 ];
 
 export default function FilterBar({ filter, zones, onFilterChange }: Props) {

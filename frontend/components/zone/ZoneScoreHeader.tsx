@@ -2,7 +2,17 @@
 
 import type { ZoneDetail } from "@/domain/types";
 import { scoreColor } from "@/domain/scoring";
+import { SIGNAL_LABELS } from "@/domain/constants";
 import { useCountUp } from "@/hooks/useCountUp";
+
+function buildExplanation(zone: ZoneDetail): string {
+  const causes = (zone.top_causes ?? [])
+    .map(c => SIGNAL_LABELS[c] ?? c)
+    .join(", ");
+  if (!causes) return "Aucun facteur de tension notable.";
+  const verb = zone.urban_score >= 55 ? "Tension liée à" : "Activité légèrement élevée sur";
+  return `${verb} : ${causes}.`;
+}
 
 type Props = {
   zone: ZoneDetail;
@@ -36,15 +46,15 @@ export default function ZoneScoreHeader({ zone, simDate }: Props) {
           <div className="text-[26px] font-extrabold">{zone.zone_name}</div>
           {!isSimMode && (
             <div className="mt-1 text-xs text-text-muted">
-              {"\u03c6"} = {zone.components.phi.toFixed(2)} · {new Date(zone.timestamp).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris" })}
+              Mis à jour à {new Date(zone.timestamp).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris" })}
             </div>
           )}
           {isSimMode && (
             <div className="mt-1 text-xs text-[#f97316]">
-              Simulation · {simDate} · {"\u03c6"} = {zone.components.phi.toFixed(2)}
+              Simulation · {simDate}
             </div>
           )}
-          <div className="mt-3 text-[13px] leading-relaxed text-text-secondary">{zone.explanation}</div>
+          <div className="mt-3 text-[13px] leading-relaxed text-text-secondary">{buildExplanation(zone)}</div>
         </div>
         <div className="ml-4 shrink-0 text-right">
           <div className="text-[56px] font-black leading-none" style={{ color: col }}>{displayScore}</div>

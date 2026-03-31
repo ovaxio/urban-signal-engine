@@ -12,7 +12,7 @@ export default function ZoneNeighbors({ neighbors, simDate }: Props) {
 
   return (
     <div className="rounded-xl border border-border bg-bg-card p-5">
-      <div className="mb-3.5 text-[10px] font-semibold tracking-widest text-text-muted">ZONES VOISINES</div>
+      <div className="mb-3.5 text-[10px] font-semibold tracking-widest text-text-muted">ZONES ADJACENTES</div>
       <div className="flex flex-wrap gap-2">
         {neighbors.map(n => (
           <Link key={n.zone_id} href={`/zones/${n.zone_id}${isSimMode ? `?sim=${simDate}` : ""}`}>

@@ -54,8 +54,8 @@ export type ZoneDetail = {
   level: string;
   signals: Record<string, number>;
   components: ZoneComponents;
+  top_causes: string[];
   timestamp: string;
-  explanation: string;
   incident_events?: IncidentEvent[];
   neighbors: ZoneNeighbor[];
   sim_events?: string[];

@@ -51,10 +51,10 @@ export default function ZoneHistoryChart({ zoneId, limit = 48 }: Props) {
     <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
       <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div>
-          <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Historique — {data.length} relevés</h2>
+          <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Évolution du score — {data.length} derniers relevés</h2>
           <div style={{ marginTop: 4, display: "flex", gap: 16, fontSize: 11, color: "var(--text-muted)" }}>
-            <span><span style={{ color: "#6366f1", fontWeight: 500 }}>Gauche</span> — Score (0–100)</span>
-            <span><span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>Droite</span> — Signaux bruts</span>
+            <span><span style={{ color: "#6366f1", fontWeight: 500 }}>Score de tension</span> — échelle 0–100</span>
+            <span><span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>Facteurs</span> — intensité mesurée</span>
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
