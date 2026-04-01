@@ -119,6 +119,13 @@ FORECAST_LEARN_MIN_N: int = 100       # min evaluations per horizon before learn
 FORECAST_LEARN_ALPHA: float = 0.15    # EMA smoothing factor (~6 weeks memory)
 FORECAST_LEARN_MAX_STEP: float = 0.05 # max weight change per cycle
 
+# ── Multi-zone contribution gaussienne (ADR-019) ─────────────────────────────
+# Chaque point (segment trafic, incident, station) contribue à plusieurs zones
+# avec poids gaussien décroissant. Désactivé par défaut (nearest-centroid legacy).
+MULTIZONE_ENABLED: bool = os.getenv("MULTIZONE_ENABLED", "false").lower() == "true"
+MULTIZONE_SIGMA_KM: float = 1.2   # sigma gaussien — à 0.8km: w≈0.72, 1.2km: w≈0.61, 2km: w≈0.19
+MULTIZONE_MIN_WEIGHT: float = 0.05  # ignore contributions < 5% (bruit zones lointaines)
+
 # Mapping état Criter → ratio synthétique de congestion
 # V=fluide, O=dense, R=chargé, N=coupée, G/*/inconnu=ignoré
 CRITER_ETAT_TO_RATIO: Dict[str, float] = {

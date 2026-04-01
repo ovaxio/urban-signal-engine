@@ -12,6 +12,7 @@ from config import (
     APIS, ENABLE_HISTORY, CRITER_ETAT_TO_RATIO, ZONE_CENTROIDS,
     WEATHER_PRECIP_DIVISOR, WEATHER_WIND_THRESHOLD,
     WEATHER_WMO_SCORE, WEATHER_SCORE_MAX,
+    MULTIZONE_ENABLED, MULTIZONE_SIGMA_KM, MULTIZONE_MIN_WEIGHT,
 )
 from services.events import fetch_event_signals
 from services.smoothing import smooth_signals
@@ -54,6 +55,42 @@ def _nearest_zone(lat: float, lon: float) -> Optional[str]:
     if best_d > _MAX_ZONE_D2:
         return None
     return best
+
+
+def _zone_weights_raw(lat: float, lon: float) -> Dict[str, float]:
+    """Poids gaussien brut (non normalisé) par zone dans le rayon _MAX_ZONE_D2."""
+    _2sigma2 = 2.0 * MULTIZONE_SIGMA_KM ** 2
+    raw: Dict[str, float] = {}
+    for zone, (zlat, zlon) in ZONE_CENTROIDS.items():
+        d2 = (lat - zlat) ** 2 + ((lon - zlon) * _COS_LAT_LYON) ** 2
+        if d2 > _MAX_ZONE_D2:
+            continue
+        d_km = math.sqrt(d2) * 111.1
+        w = math.exp(-(d_km ** 2) / _2sigma2)
+        if w >= MULTIZONE_MIN_WEIGHT:
+            raw[zone] = w
+    return raw
+
+
+def _zone_weights(lat: float, lon: float) -> Dict[str, float]:
+    """Poids gaussien normalisé sum=1 (ADR-019). Pour trafic/vélo'v :
+    un segment se DISTRIBUE entre zones."""
+    raw = _zone_weights_raw(lat, lon)
+    if not raw:
+        return {}
+    total = sum(raw.values())
+    return {z: round(w / total, 4) for z, w in raw.items()}
+
+
+def _zone_weights_radiate(lat: float, lon: float) -> Dict[str, float]:
+    """Poids gaussien normalisé max=1 (ADR-019). Pour incidents :
+    un événement RAYONNE vers les zones voisines sans perdre d'intensité."""
+    raw = _zone_weights_raw(lat, lon)
+    if not raw:
+        return {}
+    max_w = max(raw.values())
+    return {z: round(w / max_w, 4) for z, w in raw.items()}
+
 
 # ---------------------------------------------------------------------------
 # Météo — Open-Meteo
@@ -208,16 +245,22 @@ async def fetch_traffic() -> Dict[str, float]:
         # Midpoint du tronçon (LineString [lon, lat])
         mid      = coords[len(coords) // 2]
         lat, lon = float(mid[1]), float(mid[0])
-        zone     = _nearest_zone(lat, lon)
-        if zone:
-            zone_ratios[zone].append(ratio)
+        if MULTIZONE_ENABLED:
+            weights = _zone_weights(lat, lon)
+            for z, w in weights.items():
+                zone_ratios[z].append((ratio, w))
+        else:
+            zone = _nearest_zone(lat, lon)
+            if zone:
+                zone_ratios[zone].append((ratio, 1.0))
 
     result: Dict[str, float] = {}
     for zone, ratios in zone_ratios.items():
         if ratios:
-            avg = sum(ratios) / len(ratios)
-            n_congested = sum(1 for r in ratios if r >= 2.0)  # O + R + N
-            frac = n_congested / len(ratios)
+            total_w = sum(w for _, w in ratios)
+            avg = sum(r * w for r, w in ratios) / total_w
+            n_congested = sum(w for r, w in ratios if r >= 2.0)  # O + R + N
+            frac = n_congested / total_w
             boosted = avg + frac * _CONGESTION_BOOST
             result[zone] = round(max(0.5, min(3.0, boosted)), 3)
             log.info(
@@ -430,28 +473,36 @@ async def fetch_incidents() -> tuple:
         if not point:
             continue
         lat, lon = point
-        zone = _nearest_zone(lat, lon)
-        if not zone:
-            continue
+        if MULTIZONE_ENABLED:
+            zones_map = _zone_weights_radiate(lat, lon)
+            if not zones_map:
+                continue
+        else:
+            z_single = _nearest_zone(lat, lon)
+            if not z_single:
+                continue
+            zones_map = {z_single: 1.0}
         structural = _is_structural_event(props)
         criter_id  = props.get("id")
 
-        # Scores par horizon
+        # Scores par horizon — distribuer sur toutes les zones contribuantes
         for h in _INCIDENT_HORIZONS:
             target = now + datetime.timedelta(minutes=h)
             if _is_event_active_at(props, target):
-                if criter_id and criter_id in h_zone_seen[h][zone]:
-                    continue
                 local_hour = target.astimezone(_PARIS).hour + target.astimezone(_PARIS).minute / 60.0
                 decay = _structural_decay(local_hour) if structural else 1.0
                 weight = _criter_event_weight(props, decay=decay)
-                h_zone_weights[h][zone].append(weight)
-                if criter_id:
-                    h_zone_seen[h][zone].add(criter_id)
+                for zone, zw in zones_map.items():
+                    if criter_id and criter_id in h_zone_seen[h][zone]:
+                        continue
+                    h_zone_weights[h][zone].append(weight * zw)
+                    if criter_id:
+                        h_zone_seen[h][zone].add(criter_id)
 
-        # Display (h=0 uniquement)
+        # Display (h=0 uniquement) — zone principale seulement (éviter doublons UI)
         if _is_event_active_at(props, now):
-            events_by_zone[zone].append(_build_event_display(props, now, _PARIS))
+            primary_zone = max(zones_map, key=zones_map.get)
+            events_by_zone[primary_zone].append(_build_event_display(props, now, _PARIS))
 
     # Merge TomTom incidents
     _TT_DECAY: Dict[int, Dict[int, float]] = {
@@ -667,10 +718,6 @@ async def _fetch_tomtom_incidents_cached() -> list:
             lon, lat = coords[0][0], coords[0][1]
         else:
             lon, lat = coords[0], coords[1]
-        zone = _nearest_zone(float(lat), float(lon))
-        if not zone:
-            continue
-
         icon_cat  = int(props.get("iconCategory", 0))
         magnitude = int(props.get("magnitudeOfDelay", 1))
         delay_s   = props.get("delay") or 0
@@ -688,18 +735,39 @@ async def _fetch_tomtom_incidents_cached() -> list:
 
         delay_min = round(int(delay_s) / 60) if delay_s else 0
 
-        result.append({
-            "zone":      zone,
-            "weight":    weight,
-            "label":     label,
-            "detail":    detail,
-            "direction": "",
-            "delay_min": delay_min,
-            "evt_type":  _TOMTOM_CATEGORY_TYPE.get(icon_cat, "other"),
-            "icon_cat":  icon_cat,
-            "lat":       float(lat),
-            "lon":       float(lon),
-        })
+        if MULTIZONE_ENABLED:
+            zones_map = _zone_weights_radiate(float(lat), float(lon))
+            if not zones_map:
+                continue
+            for z, zw in zones_map.items():
+                result.append({
+                    "zone":      z,
+                    "weight":    weight * zw,
+                    "label":     label,
+                    "detail":    detail,
+                    "direction": "",
+                    "delay_min": delay_min,
+                    "evt_type":  _TOMTOM_CATEGORY_TYPE.get(icon_cat, "other"),
+                    "icon_cat":  icon_cat,
+                    "lat":       float(lat),
+                    "lon":       float(lon),
+                })
+        else:
+            zone = _nearest_zone(float(lat), float(lon))
+            if not zone:
+                continue
+            result.append({
+                "zone":      zone,
+                "weight":    weight,
+                "label":     label,
+                "detail":    detail,
+                "direction": "",
+                "delay_min": delay_min,
+                "evt_type":  _TOMTOM_CATEGORY_TYPE.get(icon_cat, "other"),
+                "icon_cat":  icon_cat,
+                "lat":       float(lat),
+                "lon":       float(lon),
+            })
 
     # ── Clustering géographique : regrouper incidents TomTom <200m ──
     result = _cluster_tomtom_incidents(result)
@@ -871,10 +939,18 @@ async def _fetch_velov() -> Dict[str, float]:
         lng   = item.get("lng")
         if lat is None or lng is None:
             continue
-        zone = _nearest_zone(float(lat), float(lng))
-        if zone:
-            zone_tauxs.setdefault(zone, []).append(taux)
-    return {z: round(sum(v) / len(v), 4) for z, v in zone_tauxs.items()}
+        if MULTIZONE_ENABLED:
+            weights = _zone_weights(float(lat), float(lng))
+            for z, w in weights.items():
+                zone_tauxs.setdefault(z, []).append((taux, w))
+        else:
+            zone = _nearest_zone(float(lat), float(lng))
+            if zone:
+                zone_tauxs.setdefault(zone, []).append((taux, 1.0))
+    return {
+        z: round(sum(t * w for t, w in v) / sum(w for _, w in v), 4)
+        for z, v in zone_tauxs.items()
+    }
 
 _PEAK_ZONES = {"part-dieu", "presquile", "perrache", "guillotiere"}
 

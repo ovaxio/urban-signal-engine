@@ -68,6 +68,7 @@ Decisions in `docs/decisions/`. Read relevant ADR before modifying any Triggers 
 | 016 | Modular context architecture | CLAUDE.md, context/, .claude/agents/, SoloCraft context-modules |
 | 017 | WMO granular weather score scale | config.py WEATHER_WMO_SCORE, ingestion.py _weather_score_from_values, _wmo_contribution |
 | 018 | Forecast auto-learning | forecast_learning.py, scoring.py _forecast_short/extended_horizon, config.py FORECAST_LEARN_*, main.py calibration_loop |
+| 019 | Multi-zone weighted contribution | ingestion.py _zone_weights, config.py MULTIZONE_*, backtest_multizone.py |
 
 ## Known issues — do not re-investigate without new data
 - Deploy jump in history chart: seed is fresh (pre-commit, ~2-3min delta)
